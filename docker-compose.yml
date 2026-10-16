@@ -1,0 +1,28 @@
+# docker compose up -d            -> Hailey on http://localhost:8787
+# docker compose --profile search up -d   -> also start a private SearXNG for web research
+services:
+  hailey:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DATA_DIR: /data
+      # Inside compose, SearXNG is reachable by its service name:
+      # SEARXNG_URL: http://searxng:8080
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - hailey-data:/data
+
+  searxng:
+    profiles: ["search"]
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    volumes:
+      - ./deploy/searxng:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+
+volumes:
+  hailey-data:
