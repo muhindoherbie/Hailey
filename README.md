@@ -102,11 +102,16 @@ Edit `.env` (in Notepad) and fill in **one** of the options below, then restart 
    setx OLLAMA_CONTEXT_LENGTH 16384
    ```
    (Or use the context-length slider in the Ollama app's settings.) More context uses more RAM: 16K suits a 4B model on a 16 GB laptop.
-4. **On a laptop without a strong GPU,** choose a small model such as `qwen3:4b` and turn off step-by-step "thinking" so replies come faster:
+4. **On a laptop without a strong GPU,** choose a small *non-thinking* model. Tested on an i7-1255U laptop with 16 GB RAM and no dedicated GPU:
    ```
-   OPENAI_COMPAT_MODEL=qwen3:4b
-   OPENAI_COMPAT_REASONING_EFFORT=none
+   OPENAI_COMPAT_MODEL=qwen3:4b-instruct
+   OPENAI_COMPAT_TOOLSET=core
    ```
+   - `qwen3:4b` (the "thinking" version) took over a minute per reply and could not turn thinking off — prefer `qwen3:4b-instruct`. For thinking models that support it, `OPENAI_COMPAT_REASONING_EFFORT=none` turns thinking off.
+   - Keep the model loaded between messages so its prompt cache survives: `setx OLLAMA_KEEP_ALIVE 30m`, then restart Ollama. The first message after loading took about 2 minutes; later replies started in roughly 4–30 seconds.
+   - `OPENAI_COMPAT_TOOLSET=core` sends 13 everyday tools instead of all 30, roughly halving the prompt.
+
+   **What to expect from a 4B model:** fine for conversation, questions and simple reminders, but unreliable at actions — in testing it sometimes skipped saving a memory, guessed ids, or claimed it had scheduled something it hadn't. Hailey checks for this: a reply that claims an action no tool performed gets a visible *"Not actually saved"* warning, and an explicit "remember that…" request that wasn't saved says so. For dependable task, reminder and memory handling, use Claude (Haiku 5.5 costs about US$1–2/month for typical personal use) or a larger local model on a PC with a capable GPU.
 
    Hardware: an 8B model needs about 8 GB of free RAM (16 GB total recommended) and runs much faster with a recent GPU. Smaller models (e.g. 3–4B) work on modest PCs but are weaker at using tools; if tool calls fail, set `OPENAI_COMPAT_TOOLS=false` for plain chat. Check what is loaded and its context size with `ollama ps`.
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { setup, signup, type TestCtx } from './helpers.ts';
-import { executeTool, makeContext, approveAction, toolSpecs, TOOLS } from '../server/tools/registry.ts';
+import { executeTool, makeContext, approveAction, toolSpecs, TOOLS, CORE_TOOLS } from '../server/tools/registry.ts';
 import { sensitivityOf, retrieveMemories, expireMemories } from '../server/services/memory.ts';
 
 let ctx: TestCtx;
@@ -106,6 +106,12 @@ describe('tool registry and approvals', () => {
       expect(s.description.length).toBeGreaterThan(20);
     }
     expect(TOOLS.filter((t) => t.risk === 'consequential').every((t) => t.name.startsWith('delete_'))).toBe(true);
+  });
+
+  it('offers a smaller core tool set for local models', () => {
+    const core = toolSpecs('core');
+    expect(core.map((t) => t.name).sort()).toEqual([...CORE_TOOLS].sort());
+    expect(JSON.stringify(core).length).toBeLessThan(JSON.stringify(toolSpecs()).length * 0.6);
   });
 
   it('rejects invalid or unknown tool input without side effects', async () => {

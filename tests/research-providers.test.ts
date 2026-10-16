@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setup, signup, text, toolCall, parseSSE, type TestCtx } from './helpers.ts';
-import { OpenAICompatProvider } from '../server/ai/openai-compat.ts';
+import { OpenAICompatProvider, ThinkFilter } from '../server/ai/openai-compat.ts';
 import { createSearchService } from '../server/services/search.ts';
 import { ProviderRegistry } from '../server/ai/providers.ts';
 import { AnthropicProvider } from '../server/ai/anthropic.ts';
@@ -125,6 +125,18 @@ describe('AI provider adapters', () => {
     const res = await p.chat({ system: 's', tools: [], messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }] });
     expect(body.reasoning_effort).toBe('none');
     expect(res.content).toEqual([{ type: 'text', text: 'Answer.' }]);
+  });
+
+  it('hides <think> blocks that local models leak into the reply, even when split across chunks', () => {
+    const run = (chunks: string[]) => {
+      const f = new ThinkFilter();
+      return chunks.map((c) => f.push(c)).join('') + f.flush();
+    };
+    expect(run(['<th', 'ink>plan', 'ning…</thi', 'nk>\n\nHello!'])).toBe('Hello!');
+    expect(run(['Plain ', 'answer'])).toBe('Plain answer');
+    expect(run(['<', 'b>bold</b>'])).toBe('<b>bold</b>');
+    expect(run(['<think>never closed'])).toBe('');
+    expect(run(['Use <think> tags'])).toBe('Use <think> tags');
   });
 
   it('maps HTTP failures to clear, typed errors', async () => {

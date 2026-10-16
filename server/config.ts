@@ -24,6 +24,8 @@ const schema = z.object({
   OPENAI_COMPAT_TOOLS: z.enum(['true', 'false']).default('true'),
   /** Sent as reasoning_effort, e.g. 'none' to turn off slow thinking on local models. */
   OPENAI_COMPAT_REASONING_EFFORT: z.string().max(20).optional(),
+  /** core = everyday tools only (shorter prompt, much faster on small local models); full = all tools. */
+  OPENAI_COMPAT_TOOLSET: z.enum(['core', 'full']).default('core'),
   DEFAULT_PROVIDER: z.enum(['anthropic', 'openai_compat']).optional(),
 
   // Web research

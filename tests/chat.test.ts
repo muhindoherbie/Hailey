@@ -214,3 +214,55 @@ describe('conversations', () => {
     expect(Buffer.from(file.data).subarray(0, 5).toString()).toBe('%PDF-');
   });
 });
+
+describe('unbacked action claims', () => {
+  it('flags replies that claim an action no tool performed', async () => {
+    const { unbackedClaimWarning } = await import('../server/ai/agent.ts');
+    // The exact pattern a small local model produced in testing.
+    const fake = 'I\'ll set a reminder for tomorrow. ✅ Reminder scheduled: **Sun, 18 Oct 2026, 09:00**';
+    expect(unbackedClaimWarning(fake, [{ name: 'parse_datetime', status: 'executed' }])).toMatch(/Not actually saved.*reminder/);
+    expect(unbackedClaimWarning(fake, [{ name: 'create_reminder', status: 'executed' }])).toBe('');
+    expect(unbackedClaimWarning('Done — I will remember that you prefer tea.', [])).toMatch(/memory/);
+    expect(unbackedClaimWarning('I added it to your list.', [{ name: 'create_task', status: 'error' }])).toMatch(/task/);
+    expect(unbackedClaimWarning('Here is your plan for today.', [])).toBe('');
+    expect(unbackedClaimWarning('Would you like me to set a reminder?', [])).toBe('');
+  });
+
+  it('appends the warning to the stored reply', async () => {
+    const c = await signup(ctx);
+    const conv = (await c.post('/api/conversations', {})).data;
+    ctx.provider.steps.push(() => text('Reminder scheduled for 9am tomorrow.'));
+    const { events } = await send(c, conv.id, { text: 'remind me at 9' });
+    const msg = events.find((e) => e.event === 'message')!.data.message;
+    expect(msg.content).toMatch(/Not actually saved/);
+  });
+});
+
+describe('explicit remember requests', () => {
+  it('tells the user when an explicit "remember" request was not saved', async () => {
+    const c = await signup(ctx);
+    const conv = (await c.post('/api/conversations', {})).data;
+    ctx.provider.steps.push(() => text('Got it. I will keep answers short.'));
+    const { events } = await send(c, conv.id, { text: 'Please remember that I prefer short answers.' });
+    expect(events.find((e) => e.event === 'message')!.data.message.content).toMatch(/not saved to long-term memory/);
+  });
+
+  it('stays quiet when the memory was actually saved', async () => {
+    const c = await signup(ctx);
+    const conv = (await c.post('/api/conversations', {})).data;
+    ctx.provider.steps.push(() => toolCall('save_memory', { content: 'Prefers short answers', category: 'preference', user_requested: true }), () => text('Saved.'));
+    const { events } = await send(c, conv.id, { text: 'Please remember that I prefer short answers.' });
+    expect(events.find((e) => e.event === 'message')!.data.message.content).toBe('Saved.');
+  });
+
+  it('gives the model a recovery hint when it guesses an id', async () => {
+    const c = await signup(ctx);
+    const conv = (await c.post('/api/conversations', {})).data;
+    ctx.provider.steps.push(() => toolCall('create_task', { title: 'Restock gloves', project_id: 'inventory' }), (req) => {
+      const r = JSON.parse((req.messages.at(-1)!.content[0] as any).content);
+      expect(r.error).toMatch(/leave the field out/);
+      return text('Could not add it.');
+    });
+    await send(c, conv.id, { text: 'Add a task to restock gloves' });
+  });
+});

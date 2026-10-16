@@ -7,10 +7,10 @@ import { ProviderError } from './types.ts';
  * compatibility endpoint, etc. Streaming via SSE; tool calls when the model supports them.
  */
 export class OpenAICompatProvider implements AIProvider {
-  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string };
+  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full' };
   private fetchImpl: typeof fetch;
 
-  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string }, fetchImpl: typeof fetch = fetch) {
+  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full' }, fetchImpl: typeof fetch = fetch) {
     this.opts = opts;
     this.fetchImpl = fetchImpl;
   }
@@ -26,7 +26,7 @@ export class OpenAICompatProvider implements AIProvider {
       label: this.opts.label,
       model: this.opts.model ?? '',
       configured,
-      capabilities: { tools: this.opts.tools, streaming: true, local },
+      capabilities: { tools: this.opts.tools, streaming: true, local, toolset: this.opts.toolset ?? 'core' },
       note: configured ? undefined : 'Set OPENAI_COMPAT_BASE_URL and OPENAI_COMPAT_MODEL on the server (e.g. Ollama at http://localhost:11434/v1).',
     };
   }
@@ -67,6 +67,7 @@ export class OpenAICompatProvider implements AIProvider {
 
     let text = '';
     let finish = '';
+    const think = new ThinkFilter();
     const usage = { inputTokens: 0, outputTokens: 0 };
     const calls = new Map<number, { id: string; name: string; args: string }>();
     try {
@@ -86,8 +87,11 @@ export class OpenAICompatProvider implements AIProvider {
         if (!choice) continue;
         const delta = choice.delta ?? {};
         if (typeof delta.content === 'string' && delta.content) {
-          text += delta.content;
-          req.onText?.(delta.content);
+          const visible = think.push(delta.content);
+          if (visible) {
+            text += visible;
+            req.onText?.(visible);
+          }
         }
         for (const tc of delta.tool_calls ?? []) {
           const i = tc.index ?? 0;
@@ -104,8 +108,13 @@ export class OpenAICompatProvider implements AIProvider {
       throw new ProviderError('unavailable', `The connection to ${this.opts.label} was interrupted.`, true);
     }
 
+    const rest = think.flush();
+    if (rest) {
+      text += rest;
+      req.onText?.(rest);
+    }
     const content: Block[] = [];
-    if (text) content.push({ type: 'text', text });
+    if (text.trim()) content.push({ type: 'text', text: text.replace(/^\s+/, '') });
     for (const call of calls.values()) {
       let input: unknown = {};
       try {
@@ -117,6 +126,45 @@ export class OpenAICompatProvider implements AIProvider {
     }
     const stopReason = calls.size ? 'tool_use' : finish === 'length' ? 'max_tokens' : 'end_turn';
     return { content, stopReason, usage, model };
+  }
+}
+
+/**
+ * Hides a leading <think>…</think> block that some local models put in the visible reply,
+ * so private reasoning never reaches the user. Works on streamed fragments.
+ */
+export class ThinkFilter {
+  private buf = '';
+  private state: 'start' | 'thinking' | 'pass' = 'start';
+
+  push(chunk: string): string {
+    if (this.state === 'pass') return chunk;
+    this.buf += chunk;
+    if (this.state === 'start') {
+      const t = this.buf.trimStart();
+      if (!t) return '';
+      if (t.startsWith('<think>')) this.state = 'thinking';
+      else if ('<think>'.startsWith(t)) return ''; // could still become "<think>"
+      else {
+        this.state = 'pass';
+        const out = this.buf;
+        this.buf = '';
+        return out;
+      }
+    }
+    const end = this.buf.indexOf('</think>');
+    if (end < 0) return '';
+    const out = this.buf.slice(end + '</think>'.length).replace(/^\s+/, '');
+    this.buf = '';
+    this.state = 'pass';
+    return out;
+  }
+
+  /** At end of stream: an unfinished think block is dropped; undecided text is released. */
+  flush(): string {
+    const out = this.state === 'start' ? this.buf : '';
+    this.buf = '';
+    return out;
   }
 }
 

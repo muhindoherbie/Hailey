@@ -227,7 +227,10 @@ export const TOOLS: ToolDef[] = [
     run: (i, ctx) => {
       const p = parseWhen(i.text, ctx.now, ctx.timeZone);
       if (!p) return { understood: false };
-      return { understood: true, iso: p.iso, local: formatLocal(p.iso, ctx.timeZone, ctx.settings.regional.locale), all_day: p.allDay, ambiguities: p.ambiguities };
+      return {
+        understood: true, iso: p.iso, local: formatLocal(p.iso, ctx.timeZone, ctx.settings.regional.locale), all_day: p.allDay, ambiguities: p.ambiguities,
+        note: 'This only interprets the date. Nothing has been scheduled — call create_reminder or create_task to actually save it.',
+      };
     },
   }),
 
@@ -500,9 +503,15 @@ for (const t of TOOLS) if (t.risk === 'consequential') CONSEQUENTIAL_GUARD.add(t
 
 export const TOOL_MAP = new Map(TOOLS.map((t) => [t.name, t]));
 
+/** The everyday tools sent to small local models, to keep their prompt short and fast. */
+export const CORE_TOOLS = new Set([
+  'search_knowledge', 'list_tasks', 'get_daily_overview', 'recall_memories', 'web_search', 'parse_datetime',
+  'create_task', 'update_task', 'complete_task', 'create_reminder', 'save_memory', 'create_note', 'delete_task',
+]);
+
 /** JSON-schema tool specs for the model. Generated deterministically so the prompt prefix stays stable. */
-export function toolSpecs(): ToolSpec[] {
-  return TOOLS.map((t) => {
+export function toolSpecs(toolset: 'core' | 'full' = 'full'): ToolSpec[] {
+  return TOOLS.filter((t) => toolset === 'full' || CORE_TOOLS.has(t.name)).map((t) => {
     const schema = z.toJSONSchema(t.input, { target: 'draft-7', io: 'input' }) as Record<string, unknown>;
     delete schema.$schema;
     return { name: t.name, description: `${t.description}${t.risk === 'consequential' ? ' (Queued for the user to approve — not executed immediately.)' : ''}`, input_schema: schema };
@@ -612,10 +621,14 @@ async function runAction(ctx: ToolContext, tool: ToolDef, actionId: string, inpu
     );
     return { status: 'executed', actionId, result, summary, risk: tool.risk };
   } catch (err: any) {
-    const msg = err instanceof ToolError || err instanceof HttpError ? err.message
+    let msg = err instanceof ToolError || err instanceof HttpError ? err.message
       : err?.name === 'ZodError' ? `Invalid data: ${err.issues?.map((i: any) => i.message).join('; ')}`
       : err?.constructor?.name === 'SearchUnavailableError' ? err.message
       : 'The action failed due to an internal error.';
+    // Help the model recover when it guessed an id instead of looking it up.
+    if (/^(Project|Workspace|Parent task|Task|Note|Document|Memory) not found$/.test(msg)) {
+      msg += '. Only use ids returned by a tool (list_projects, list_tasks, search_knowledge); otherwise leave the field out and try again.';
+    }
     if (!(err instanceof ToolError) && !(err instanceof HttpError)) console.error(`[tool ${tool.name}]`, err?.message ?? err);
     db.run("UPDATE actions SET status = 'failed', error = ?, executed_at = ? WHERE id = ?", msg, nowIso(), actionId);
     return { status: 'error', actionId, error: msg, summary, risk: tool.risk };

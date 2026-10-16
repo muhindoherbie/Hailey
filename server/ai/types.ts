@@ -46,7 +46,7 @@ export interface ProviderInfo {
   label: string;
   model: string;
   configured: boolean;
-  capabilities: { tools: boolean; streaming: boolean; local: boolean };
+  capabilities: { tools: boolean; streaming: boolean; local: boolean; toolset?: 'core' | 'full' };
   /** USD per million tokens, when known. */
   pricing?: { input: number; output: number };
   note?: string;
