@@ -116,6 +116,17 @@ describe('AI provider adapters', () => {
     expect(p.info().capabilities.local).toBe(true);
   });
 
+  it('can turn off thinking and never shows the model’s reasoning text', async () => {
+    let body: any;
+    const p = new OpenAICompatProvider({ baseUrl: 'http://localhost:11434/v1', model: 'qwen3:4b', label: 'Ollama', tools: true, reasoningEffort: 'none' }, (async (_u: string, init: any) => {
+      body = JSON.parse(init.body);
+      return sse([{ choices: [{ delta: { reasoning: 'secret chain of thought' } }] }, { choices: [{ delta: { content: 'Answer.' }, finish_reason: 'stop' }] }]);
+    }) as any);
+    const res = await p.chat({ system: 's', tools: [], messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }] });
+    expect(body.reasoning_effort).toBe('none');
+    expect(res.content).toEqual([{ type: 'text', text: 'Answer.' }]);
+  });
+
   it('maps HTTP failures to clear, typed errors', async () => {
     const mk = (status: number) => new OpenAICompatProvider({ baseUrl: 'https://api.example/v1', model: 'm', label: 'Groq', tools: true }, (async () => new Response('err', { status })) as any);
     const req = { system: '', tools: [], messages: [{ role: 'user' as const, content: [{ type: 'text' as const, text: 'x' }] }] };

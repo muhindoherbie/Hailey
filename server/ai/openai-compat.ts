@@ -7,10 +7,10 @@ import { ProviderError } from './types.ts';
  * compatibility endpoint, etc. Streaming via SSE; tool calls when the model supports them.
  */
 export class OpenAICompatProvider implements AIProvider {
-  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean };
+  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string };
   private fetchImpl: typeof fetch;
 
-  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean }, fetchImpl: typeof fetch = fetch) {
+  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string }, fetchImpl: typeof fetch = fetch) {
     this.opts = opts;
     this.fetchImpl = fetchImpl;
   }
@@ -41,6 +41,7 @@ export class OpenAICompatProvider implements AIProvider {
       max_tokens: req.maxTokens ?? 4096,
       messages: toOpenAI(req.system, req.messages),
     };
+    if (this.opts.reasoningEffort) body.reasoning_effort = this.opts.reasoningEffort;
     if (this.opts.tools && req.tools.length) {
       body.tools = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
     }

@@ -59,6 +59,7 @@ export function createRegistry(config: Config): ProviderRegistry {
       model: config.OPENAI_COMPAT_MODEL,
       label: config.OPENAI_COMPAT_LABEL,
       tools: config.OPENAI_COMPAT_TOOLS === 'true',
+      reasoningEffort: config.OPENAI_COMPAT_REASONING_EFFORT,
     }),
   );
   reg.setDefault(config.DEFAULT_PROVIDER);

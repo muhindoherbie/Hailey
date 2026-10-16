@@ -97,7 +97,18 @@ Edit `.env` (in Notepad) and fill in **one** of the options below, then restart 
    OPENAI_COMPAT_MODEL=qwen3:8b
    OPENAI_COMPAT_LABEL=Local model (Ollama)
    ```
-   Hardware: an 8B model needs about 8 GB of free RAM (16 GB total recommended) and runs much faster with a recent GPU. Smaller models (e.g. 3–4B) work on modest PCs but are weaker at using tools; if tool calls fail, set `OPENAI_COMPAT_TOOLS=false` for plain chat.
+3. **Give the model a big enough context window (important).** Hailey's instructions and tools take about 5,000 tokens, but Ollama defaults to 4,096 on PCs without a large GPU — the start of the prompt would be cut off and tools would misbehave. Set it once in PowerShell, then quit Ollama from the system tray and start it again:
+   ```bash
+   setx OLLAMA_CONTEXT_LENGTH 16384
+   ```
+   (Or use the context-length slider in the Ollama app's settings.) More context uses more RAM: 16K suits a 4B model on a 16 GB laptop.
+4. **On a laptop without a strong GPU,** choose a small model such as `qwen3:4b` and turn off step-by-step "thinking" so replies come faster:
+   ```
+   OPENAI_COMPAT_MODEL=qwen3:4b
+   OPENAI_COMPAT_REASONING_EFFORT=none
+   ```
+
+   Hardware: an 8B model needs about 8 GB of free RAM (16 GB total recommended) and runs much faster with a recent GPU. Smaller models (e.g. 3–4B) work on modest PCs but are weaker at using tools; if tool calls fail, set `OPENAI_COMPAT_TOOLS=false` for plain chat. Check what is loaded and its context size with `ollama ps`.
 
 ### Option C — Other OpenAI-compatible services
 Groq, OpenRouter, Google Gemini's OpenAI-compatible endpoint and similar services work with the same three `OPENAI_COMPAT_*` settings. Many have free tiers with rate limits; check each provider's current terms.
