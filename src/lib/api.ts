@@ -1,4 +1,7 @@
 /** Fetch wrapper for the Hailey API. Sends the CSRF header and turns errors into ApiError. */
+/** Lets API calls through free tunnel services (ngrok) without their browser warning page. */
+const TUNNEL_HEADERS = { 'ngrok-skip-browser-warning': '1' };
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -19,7 +22,7 @@ export function setUnauthorizedHandler(fn: () => void) {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal } = {}): Promise<T> {
-  const headers: Record<string, string> = { 'x-hailey': '1' };
+  const headers: Record<string, string> = { 'x-hailey': '1', ...TUNNEL_HEADERS };
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
   else if (opts.body !== undefined) {
@@ -53,7 +56,7 @@ export async function streamPost(path: string, body: unknown, onEvent: (event: s
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
-      method: 'POST', headers: { 'x-hailey': '1', 'content-type': 'application/json', accept: 'text/event-stream' },
+      method: 'POST', headers: { 'x-hailey': '1', ...TUNNEL_HEADERS, 'content-type': 'application/json', accept: 'text/event-stream' },
       body: JSON.stringify(body), signal, credentials: 'same-origin',
     });
   } catch (err: any) {
