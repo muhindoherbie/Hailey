@@ -130,6 +130,9 @@ function mapError(err: unknown): Error {
     return new ProviderError('auth', 'The Claude API key was rejected. Check ANTHROPIC_API_KEY on the server.');
   if (err instanceof Anthropic.RateLimitError)
     return new ProviderError('rate_limited', 'Claude is rate-limiting requests right now. Try again in a minute.', true);
+  if (err instanceof Anthropic.BadRequestError && /credit balance|billing/i.test(err.message)) {
+    return new ProviderError('auth', 'Your Anthropic account has no credit left, so Claude can’t reply. Add credit in the Claude Console (Settings → Billing), then try again.');
+  }
   if (err instanceof Anthropic.BadRequestError) return new ProviderError('bad_request', `Claude rejected the request: ${err.message}`);
   if (err instanceof Anthropic.InternalServerError) return new ProviderError('unavailable', 'Claude is temporarily unavailable. Please retry.', true);
   if (err instanceof Anthropic.APIConnectionError)

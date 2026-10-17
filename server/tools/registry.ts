@@ -48,6 +48,8 @@ const isoOrNatural = z.string().min(1).max(200).describe('ISO 8601 date-time, or
 
 function resolveWhen(value: string | null | undefined, ctx: ToolContext): string | null | undefined {
   if (value == null) return value;
+  // A plain date ("2026-10-19") means that day in the user's timezone, not midnight UTC.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return new Date(startOfLocalDay(value.trim(), ctx.timeZone).getTime() + 9 * 3600_000).toISOString();
   if (!Number.isNaN(Date.parse(value)) && /\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value).toISOString();
   const parsed = parseWhen(value, ctx.now, ctx.timeZone);
   if (!parsed) throw new ToolError(`Could not understand the date "${value}". Ask the user for a specific date and time.`);

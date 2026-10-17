@@ -53,6 +53,11 @@ describe('Claude adapter', () => {
     expect(seen[2].cache_control).toBeUndefined();
   });
 
+  it('explains an empty credit balance in plain language', async () => {
+    const p = provider([1, 2, 3].map(() => () => badRequest('Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.')), []);
+    await expect(p.chat(req)).rejects.toMatchObject({ kind: 'auth', message: expect.stringMatching(/no credit left.*Billing/) });
+  });
+
   it('maps an invalid key to a clear error', async () => {
     const p = provider([() => new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }), { status: 401, headers: { 'content-type': 'application/json' } })], []);
     await expect(p.chat(req)).rejects.toMatchObject({ kind: 'auth' });

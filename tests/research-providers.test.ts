@@ -139,6 +139,46 @@ describe('AI provider adapters', () => {
     expect(run(['Use <think> tags'])).toBe('Use <think> tags');
   });
 
+  it('keeps parallel tool calls apart when the service omits their index', async () => {
+    const p = new OpenAICompatProvider({ baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'gemini-3.8-flash', label: 'Gemini', tools: true }, (async () => sse([
+      { choices: [{ delta: { tool_calls: [{ id: 'a', type: 'function', function: { name: 'create_task', arguments: '{\"title\":\"One\"}' } }, { id: 'b', type: 'function', function: { name: 'create_task', arguments: '{\"title\":\"Two\"}' } }] }, finish_reason: 'tool_calls' }] },
+    ])) as any);
+    const res = await p.chat({ system: 's', tools: [], messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }] });
+    expect(res.content).toEqual([
+      { type: 'tool_use', id: 'a', name: 'create_task', input: { title: 'One' } },
+      { type: 'tool_use', id: 'b', name: 'create_task', input: { title: 'Two' } },
+    ]);
+    expect(p.info().capabilities.local).toBe(false);
+  });
+
+  it('sends Gemini thought signatures back with the tool call', async () => {
+    const bodies: any[] = [];
+    const p = new OpenAICompatProvider({ baseUrl: 'https://g.example/v1', apiKey: 'k', model: 'gemini', label: 'Gemini', tools: true }, (async (_u: string, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return sse([{ choices: [{ delta: { tool_calls: [{ id: 'c1', type: 'function', extra_content: { google: { thought_signature: 'SIG' } }, function: { name: 'list_tasks', arguments: '{}' } }] }, finish_reason: 'tool_calls' }] }]);
+    }) as any);
+    const first = await p.chat({ system: 's', tools: [], messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }] });
+    expect((first.content[0] as any).extra_content).toEqual({ google: { thought_signature: 'SIG' } });
+    await p.chat({ system: 's', tools: [], messages: [
+      { role: 'user', content: [{ type: 'text', text: 'q' }] },
+      { role: 'assistant', content: first.content },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'c1', content: '{}' }] },
+    ] });
+    expect(bodies[1].messages[2].tool_calls[0].extra_content).toEqual({ google: { thought_signature: 'SIG' } });
+  });
+
+  it('waits and retries when a free tier rate-limits', async () => {
+    let calls = 0;
+    const p = new OpenAICompatProvider({ baseUrl: 'https://g.example/v1', model: 'm', label: 'Gemini', tools: true }, (async () => {
+      calls++;
+      return calls < 3 ? new Response('slow down', { status: 429 }) : sse([{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]);
+    }) as any);
+    p.retryDelay = () => 0;
+    const res = await p.chat({ system: 's', tools: [], messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }] });
+    expect(calls).toBe(3);
+    expect(res.content).toEqual([{ type: 'text', text: 'ok' }]);
+  });
+
   it('maps HTTP failures to clear, typed errors', async () => {
     const mk = (status: number) => new OpenAICompatProvider({ baseUrl: 'https://api.example/v1', model: 'm', label: 'Groq', tools: true }, (async () => new Response('err', { status })) as any);
     const req = { system: '', tools: [], messages: [{ role: 'user' as const, content: [{ type: 'text' as const, text: 'x' }] }] };

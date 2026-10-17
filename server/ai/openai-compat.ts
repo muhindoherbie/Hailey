@@ -31,6 +31,11 @@ export class OpenAICompatProvider implements AIProvider {
     };
   }
 
+  /** Overridable in tests so retries don't actually wait. */
+  retryDelay(ms: number) {
+    return ms;
+  }
+
   async chat(req: ChatRequest): Promise<ChatResult> {
     const { baseUrl, apiKey, model } = this.opts;
     if (!baseUrl || !model) throw new ProviderError('not_configured', 'The OpenAI-compatible provider is not configured on the server.');
@@ -45,7 +50,8 @@ export class OpenAICompatProvider implements AIProvider {
     if (this.opts.tools && req.tools.length) {
       body.tools = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
     }
-    let res: Response;
+    let res!: Response;
+    for (let attempt = 0; attempt < 3; attempt++) {
     try {
       res = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST',
@@ -56,6 +62,12 @@ export class OpenAICompatProvider implements AIProvider {
     } catch (err: any) {
       if (err?.name === 'AbortError') throw new ProviderError('aborted', 'Response cancelled.');
       throw new ProviderError('unavailable', `Could not reach ${this.opts.label}. Is it running and reachable from the server?`, true);
+    }
+    if (res.status !== 429 || attempt === 2) break;
+    const after = Number(res.headers.get('retry-after'));
+    const waitMs = Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 30_000) : [5_000, 15_000][attempt];
+    await res.body?.cancel().catch(() => undefined);
+    await new Promise((r) => setTimeout(r, this.retryDelay(waitMs)));
     }
     if (!res.ok) {
       const text = (await res.text().catch(() => '')).slice(0, 300);
@@ -69,7 +81,7 @@ export class OpenAICompatProvider implements AIProvider {
     let finish = '';
     const think = new ThinkFilter();
     const usage = { inputTokens: 0, outputTokens: 0 };
-    const calls = new Map<number, { id: string; name: string; args: string }>();
+    const calls = new Map<number, { id: string; name: string; args: string; extra?: unknown }>();
     try {
       for await (const data of sseData(res.body!)) {
         if (data === '[DONE]') break;
@@ -94,11 +106,19 @@ export class OpenAICompatProvider implements AIProvider {
           }
         }
         for (const tc of delta.tool_calls ?? []) {
-          const i = tc.index ?? 0;
-          const cur = calls.get(i) ?? { id: tc.id ?? `call_${i}`, name: '', args: '' };
+          // Some services omit `index` and send each call whole; tell calls apart by id instead.
+          let i: number;
+          if (typeof tc.index === 'number') i = tc.index;
+          else if (tc.id) {
+            const existing = [...calls.entries()].find(([, c]) => c.id === tc.id);
+            i = existing ? existing[0] : calls.size;
+          } else i = Math.max(calls.size - 1, 0);
+          const cur: { id: string; name: string; args: string; extra?: unknown } = calls.get(i) ?? { id: tc.id ?? `call_${i}`, name: '', args: '' };
           if (tc.id) cur.id = tc.id;
           if (tc.function?.name) cur.name += tc.function.name;
           if (tc.function?.arguments) cur.args += tc.function.arguments;
+          // Provider-specific data (e.g. Gemini's thought_signature) must be sent back unchanged.
+          if (tc.extra_content) cur.extra = tc.extra_content;
           calls.set(i, cur);
         }
         if (choice.finish_reason) finish = choice.finish_reason;
@@ -122,7 +142,7 @@ export class OpenAICompatProvider implements AIProvider {
       } catch {
         input = { __invalid_json: call.args };
       }
-      content.push({ type: 'tool_use', id: call.id, name: call.name, input });
+      content.push({ type: 'tool_use', id: call.id, name: call.name, input, ...(call.extra ? { extra_content: call.extra } : {}) } as Block);
     }
     const stopReason = calls.size ? 'tool_use' : finish === 'length' ? 'max_tokens' : 'end_turn';
     return { content, stopReason, usage, model };
@@ -175,7 +195,7 @@ function toOpenAI(system: string, messages: ChatMessage[]) {
       const text = m.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
       const toolCalls = m.content
         .filter((b: any) => b.type === 'tool_use')
-        .map((b: any) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } }));
+        .map((b: any) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) }, ...(b.extra_content ? { extra_content: b.extra_content } : {}) }));
       out.push({ role: 'assistant', content: text || null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) });
     } else {
       const text = m.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
