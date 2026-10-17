@@ -52,9 +52,23 @@ jobs:
         run: |
           npx electron . --smoke-test
           if ($LASTEXITCODE -ne 0) { throw "Smoke test failed" }
-      - name: Package installer
+      - name: Package and sign installer
         working-directory: desktop
-        run: npx electron-builder --win --publish never
+        env:
+          CSC_LINK: ${{ secrets.HAILEY_WIN_CERT_B64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.HAILEY_WIN_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CSC_LINK) { throw "Missing HAILEY_WIN_CERT_B64 secret" }
+          npx electron-builder --win --publish never
+      - name: Verify signatures
+        working-directory: desktop
+        run: |
+          foreach ($f in @(Get-Item release\Hailey-Setup-*.exe) + @(Get-Item release\win-unpacked\Hailey.exe)) {
+            $s = Get-AuthenticodeSignature $f.FullName
+            if (-not $s.SignerCertificate -or $s.SignerCertificate.Subject -notlike '*Hailey (muhindoherbie)*') { throw "$($f.Name) is not signed" }
+            if (-not $s.TimeStamperCertificate) { throw "$($f.Name) has no timestamp" }
+            Write-Host "$($f.Name): signed by $($s.SignerCertificate.Subject), timestamped"
+          }
       - name: Smoke test (packaged app)
         working-directory: desktop
         run: |
@@ -117,9 +131,9 @@ jobs:
           cat > notes.md <<EOF
           ## Hailey $V
 
-          **Windows:** download \`Hailey-Setup-$V.exe\` and run it. Windows may show *"Windows protected your PC"* because the installer isn't code-signed (signing certificates cost money) — click **More info → Run anyway**. Hailey then runs in its own window and in the system tray. Add your AI key via the tray icon → *Edit settings*, then *Restart Hailey*.
+          **Windows:** download \`Hailey-Setup-$V.exe\` and run it. The installer is signed by *Hailey (muhindoherbie)* with a self-made certificate. On a PC that trusts that certificate (see the README) Windows shows it as the verified publisher; elsewhere Windows may still show *"Windows protected your PC"* — click **More info → Run anyway**. Hailey then runs in its own window and in the system tray. Add your AI key via the tray icon → *Edit settings*, then *Restart Hailey*.
 
-          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It opens your Hailey at ${{ vars.HAILEY_URL }} — your PC must be running Hailey with phone access turned on.
+          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It is signed, and opens your Hailey at ${{ vars.HAILEY_URL }}.
 
           Built from commit ${{ github.sha }}.
           EOF

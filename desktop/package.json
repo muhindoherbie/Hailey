@@ -28,7 +28,13 @@
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "icon.png",
-      "artifactName": "Hailey-Setup-${version}.exe"
+      "artifactName": "Hailey-Setup-${version}.exe",
+      "signtoolOptions": {
+        "publisherName": ["Hailey (muhindoherbie)"],
+        "signingHashAlgorithms": ["sha256"],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      },
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,

@@ -31,3 +31,4 @@ android/local.properties
 # Server secrets (live only on the server)
 deploy/oracle/*.env
 deploy/oracle/.env
+*.pfx
