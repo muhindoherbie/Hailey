@@ -1,6 +1,6 @@
 // Hailey for Windows: runs the Hailey server inside the app, shows it in a window,
 // and keeps running in the system tray so reminders and phone access keep working.
-import { app, BrowserWindow, Tray, Menu, shell, dialog, nativeImage, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, dialog, nativeImage, Notification, session } from 'electron';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -72,9 +72,21 @@ function serverEnv() {
   };
 }
 
+/** Cloud mode: HAILEY_REMOTE_URL=https://… in hailey.env opens that Hailey instead of running one here. */
+function remoteUrl() {
+  const url = (parseEnv(readFileSync(envFile, 'utf8')).HAILEY_REMOTE_URL ?? '').trim().replace(/\/+$/, '');
+  return /^https:\/\/[^\s/]+$/i.test(url) ? url : null;
+}
+
 async function startServer() {
   const { startHailey, generateVapidKeys } = await import(pathToFileURL(join(res, 'server.mjs')).href);
   ensureSettings(generateVapidKeys);
+  const remote = remoteUrl();
+  if (remote) {
+    hailey = { url: remote, remote: true, stop: async () => {} };
+    log(`cloud mode: using ${remote}`);
+    return;
+  }
   hailey = await startHailey({
     env: serverEnv(),
     staticDir: join(res, 'web'),
@@ -119,7 +131,10 @@ function createWindow() {
       e.preventDefault();
       win.hide();
       if (!app.__trayHintShown && Notification.isSupported()) {
-        new Notification({ title: 'Hailey is still running', body: 'Reminders keep working. Right-click the tray icon to quit.' }).show();
+        new Notification({
+          title: 'Hailey is still running',
+          body: hailey?.remote ? 'Hailey stays in the tray. Right-click the tray icon to quit.' : 'Reminders keep working. Right-click the tray icon to quit.',
+        }).show();
         app.__trayHintShown = true;
       }
     }
@@ -175,9 +190,11 @@ function refreshTray() {
     Menu.buildFromTemplate([
       { label: 'Open Hailey', click: createWindow },
       { type: 'separator' },
-      tunnel
-        ? { label: `Phone access: on (${tunnelUrl()})`, click: stopTunnel, toolTip: 'Click to turn off' }
-        : { label: 'Turn on phone access', click: startTunnel },
+      hailey?.remote
+        ? { label: `Using cloud Hailey (${hailey.url})`, enabled: false }
+        : tunnel
+          ? { label: `Phone access: on (${tunnelUrl()})`, click: stopTunnel, toolTip: 'Click to turn off' }
+          : { label: 'Turn on phone access', click: startTunnel },
       { type: 'separator' },
       { label: 'Edit settings (AI keys, address)…', click: () => shell.openPath(envFile) },
       { label: 'Restart Hailey (after editing settings)', click: restart },
@@ -252,6 +269,14 @@ if (process.argv.includes('--smoke-test')) {
   app.on('window-all-closed', () => {}); // keep running in the tray
   app.whenReady().then(async () => {
     app.setAppUserModelId('app.hailey.desktop');
+    // Free ngrok addresses show a warning page to browsers; this header skips it for Hailey.
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+      { urls: ['https://*.ngrok-free.dev/*', 'https://*.ngrok-free.app/*', 'https://*.ngrok.dev/*', 'https://*.ngrok.app/*'] },
+      (details, callback) => {
+        details.requestHeaders['ngrok-skip-browser-warning'] = '1';
+        callback({ requestHeaders: details.requestHeaders });
+      },
+    );
     try {
       await startServer();
     } catch (err) {

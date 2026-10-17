@@ -158,6 +158,18 @@ git tag v1.0.1
 git push origin v1.0.1
 ```
 
+## Always-on server (phone works with the PC off)
+
+`deploy/oracle/docker-compose.yml` runs Hailey and its ngrok tunnel on any Linux server with Docker (tested on an Oracle Cloud Always Free Ampere VM, Ubuntu 24.04). No ports need opening: the tunnel connects outward.
+
+1. Create the VM with your SSH public key, install Docker (`sudo apt install docker.io docker-compose-v2`), and add your user to the `docker` group.
+2. On the server, in `~/hailey-app/deploy/oracle/`, create three private files (`chmod 600`): `hailey.env` (your Hailey settings), `ngrok.env` (`NGROK_AUTHTOKEN=…`) and `.env` (`PUBLIC_URL=https://….ngrok-free.dev`).
+3. Create the data folder for the container user: `mkdir ~/hailey-data && sudo chown 1000:1000 ~/hailey-data`.
+4. From your PC: `HAILEY_SERVER=ubuntu@<ip> HAILEY_SSH_KEY=<key> scripts/deploy-server.sh` uploads the current commit and starts everything. Run it again to update.
+5. Daily backups: a cron job runs `docker compose exec -T hailey node scripts/backup.ts /data/backups` (14 kept). Copy them off the server now and then.
+
+Only one copy of Hailey may use the ngrok address at a time, so when the server runs it, set `HAILEY_REMOTE_URL=https://….ngrok-free.dev` in the Windows app's settings (`%APPDATA%\Hailey\hailey.env`). The desktop app then opens the cloud Hailey instead of running its own.
+
 ## Keeping Hailey running (hosting)
 
 Reminders and routines are sent by the server, so **the server must be running** for them to arrive on time.
