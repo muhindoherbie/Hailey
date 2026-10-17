@@ -28,3 +28,6 @@ android/local.properties
 *.jks
 *.keystore
 *.p12
+# Server secrets (live only on the server)
+deploy/oracle/*.env
+deploy/oracle/.env
