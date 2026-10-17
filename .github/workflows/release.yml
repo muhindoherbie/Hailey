@@ -1,0 +1,128 @@
+name: Release
+# Builds Hailey-Setup-<version>.exe (Windows) and Hailey-<version>.apk (Android) and publishes
+# them as a GitHub Release. Start it by pushing a tag like v1.0.0, or run it manually.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v (e.g. 1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ inputs.version || github.ref_name }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - name: Version
+        shell: bash
+        run: echo "V=${VERSION#v}" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run build
+      - name: Bundle server for the desktop app
+        run: node scripts/bundle-server.mjs
+      - name: Install Electron tooling
+        working-directory: desktop
+        run: |
+          npm ci
+          npm version $env:V --no-git-tag-version --allow-same-version
+      - name: Smoke test (development app)
+        working-directory: desktop
+        run: |
+          npx electron . --smoke-test
+          if ($LASTEXITCODE -ne 0) { throw "Smoke test failed" }
+      - name: Package installer
+        working-directory: desktop
+        run: npx electron-builder --win --publish never
+      - name: Smoke test (packaged app)
+        working-directory: desktop
+        run: |
+          $p = Start-Process -FilePath "release\win-unpacked\Hailey.exe" -ArgumentList "--smoke-test" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Packaged smoke test failed ($($p.ExitCode))" }
+          Write-Host "Packaged app passed the smoke test"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: desktop/release/Hailey-Setup-*.exe
+          if-no-files-found: error
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Version
+        run: echo "V=${VERSION#v}" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v6
+        with: { gradle-version: '9.8.1' }
+      - name: Check configuration
+        run: |
+          test -n "${{ vars.HAILEY_URL }}" || { echo "Set the HAILEY_URL repository variable"; exit 1; }
+          test -n "${{ secrets.HAILEY_KEYSTORE_B64 }}" || { echo "Missing HAILEY_KEYSTORE_B64 secret"; exit 1; }
+      - name: Build signed APK
+        working-directory: android
+        env:
+          HAILEY_KEYSTORE_PASSWORD: ${{ secrets.HAILEY_KEYSTORE_PASSWORD }}
+        run: |
+          echo "${{ secrets.HAILEY_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/hailey.p12"
+          export HAILEY_KEYSTORE_FILE="$RUNNER_TEMP/hailey.p12"
+          gradle assembleRelease --no-daemon -PhaileyUrl="${{ vars.HAILEY_URL }}" -PappVersion="$V"
+          rm -f "$RUNNER_TEMP/hailey.p12"
+          cp app/build/outputs/apk/release/app-release.apk "../Hailey-$V.apk"
+      - name: Verify signature
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --verbose --print-certs "Hailey-$V.apk" | tee verify.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" verify.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: Hailey-*.apk
+          if-no-files-found: error
+
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { merge-multiple: true, path: out }
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${VERSION#v}"
+          cat > notes.md <<EOF
+          ## Hailey $V
+
+          **Windows:** download \`Hailey-Setup-$V.exe\` and run it. Windows may show *"Windows protected your PC"* because the installer isn't code-signed (signing certificates cost money) — click **More info → Run anyway**. Hailey then runs in its own window and in the system tray. Add your AI key via the tray icon → *Edit settings*, then *Restart Hailey*.
+
+          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It opens your Hailey at ${{ vars.HAILEY_URL }} — your PC must be running Hailey with phone access turned on.
+
+          Built from commit ${{ github.sha }}.
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release create "v$V" out/* --repo "${{ github.repository }}" --title "Hailey $V" --notes-file notes.md --target "${{ github.sha }}" || \
+            gh release upload "v$V" out/* --repo "${{ github.repository }}" --clobber

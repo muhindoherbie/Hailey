@@ -37,6 +37,10 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:admin@example.com'),
 
+  // Android app (TWA): lets the Hailey APK open full-screen. Comma-separate several fingerprints.
+  ANDROID_PACKAGE_NAME: z.string().max(200).optional(),
+  ANDROID_CERT_SHA256: z.string().max(2000).optional(),
+
   MAX_UPLOAD_MB: z.coerce.number().default(15),
   DAILY_TOKEN_LIMIT: z.coerce.number().int().default(400000),
 });

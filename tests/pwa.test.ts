@@ -64,3 +64,21 @@ function require_css() {
   const html = readFileSync(resolve(dist, 'index.html'), 'utf8');
   return html.match(/assets\/([^"]+\.css)/)![1];
 }
+
+describe('android asset links', () => {
+  it('serves nothing until configured, then the app’s package and fingerprint', async () => {
+    const off = setup();
+    try {
+      expect(await (await off.app.request('http://localhost/.well-known/assetlinks.json')).json()).toEqual([]);
+    } finally {
+      off.cleanup();
+    }
+    const on = setup({ env: { ANDROID_PACKAGE_NAME: 'app.hailey.twa', ANDROID_CERT_SHA256: 'aa:bb:cc' } });
+    try {
+      const body = await (await on.app.request('http://localhost/.well-known/assetlinks.json')).json();
+      expect(body[0].target).toEqual({ namespace: 'android_app', package_name: 'app.hailey.twa', sha256_cert_fingerprints: ['AA:BB:CC'] });
+    } finally {
+      on.cleanup();
+    }
+  });
+});

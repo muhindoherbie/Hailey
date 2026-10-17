@@ -1,0 +1,56 @@
+// Hailey for Android: a Trusted Web Activity that opens your Hailey server full-screen.
+// Build: gradle assembleRelease -PhaileyUrl=https://your-address (CI passes this from a repo variable).
+plugins {
+    id 'com.android.application'
+}
+
+def haileyUrl = (project.findProperty('haileyUrl') ?: 'https://example.ngrok-free.dev').toString().replaceAll('/+$', '')
+def haileyHost = new URI(haileyUrl).host
+def appVersion = (project.findProperty('appVersion') ?: '1.0.0').toString()
+def parts = appVersion.tokenize('.').collect { it.replaceAll('[^0-9]', '') ?: '0' }.collect { it as int }
+def versionCodeValue = parts[0] * 10000 + (parts.size() > 1 ? parts[1] : 0) * 100 + (parts.size() > 2 ? parts[2] : 0)
+
+android {
+    namespace 'app.hailey.twa'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'app.hailey.twa'
+        minSdk 23
+        targetSdk 36
+        versionCode versionCodeValue
+        versionName appVersion
+        manifestPlaceholders = [hostName: haileyHost]
+        resValue 'string', 'launchUrl', "${haileyUrl}/"
+        resValue 'string', 'asset_statements', "[{\\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"${haileyUrl}\\\"}}]"
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('HAILEY_KEYSTORE_FILE')
+            if (ks) {
+                storeFile file(ks)
+                storeType 'pkcs12'
+                storePassword System.getenv('HAILEY_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('HAILEY_KEY_ALIAS') ?: 'hailey'
+                keyPassword System.getenv('HAILEY_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('HAILEY_KEYSTORE_FILE') ? signingConfigs.release : null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

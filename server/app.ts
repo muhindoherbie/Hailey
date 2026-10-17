@@ -40,6 +40,17 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
 
   app.get('/api/health', (c) => c.json({ ok: true, time: services.now().toISOString() }));
 
+  // Digital Asset Links: proves the Hailey Android app and this site belong together.
+  app.get('/.well-known/assetlinks.json', (c) => {
+    const pkg = services.config.ANDROID_PACKAGE_NAME;
+    const prints = (services.config.ANDROID_CERT_SHA256 ?? '').split(',').map((f) => f.trim().toUpperCase()).filter(Boolean);
+    if (!pkg || !prints.length) return c.json([]);
+    return c.json([{
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: prints },
+    }]);
+  });
+
   const api = new Hono<AppEnv>();
   api.use('*', csrfGuard);
   api.use('*', rateLimit({ name: 'api', windowMs: 60_000, max: 600, key: clientIp }));

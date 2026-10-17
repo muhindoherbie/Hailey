@@ -91,4 +91,13 @@ writeFileSync('public/icons/favicon.svg', `<svg xmlns="http://www.w3.org/2000/sv
 <rect width="64" height="64" rx="14" fill="#0f5f58"/>
 <path d="M ${32 + 16 * Math.cos(-12 * Math.PI / 180)} ${34 + 16 * Math.sin(-12 * Math.PI / 180)} A 16 16 0 1 1 ${32 + 16 * Math.cos(-78 * Math.PI / 180)} ${34 + 16 * Math.sin(-78 * Math.PI / 180)}" fill="none" stroke="#fff" stroke-width="5.4" stroke-linecap="butt"/>
 <circle cx="${32 + 16 * Math.cos(-Math.PI / 4)}" cy="${34 + 16 * Math.sin(-Math.PI / 4)}" r="4" fill="#f2b65a"/></svg>\n`);
-console.log('Icons written to public/icons');
+// Android app icons (launcher per density) and the white notification icon.
+const densities = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+for (const [d, size] of Object.entries(densities)) {
+  const dir = `android/app/src/main/res/mipmap-${d}`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${dir}/ic_launcher.png`, render(size));
+}
+mkdirSync('android/app/src/main/res/drawable', { recursive: true });
+writeFileSync('android/app/src/main/res/drawable/ic_notification.png', render(96, { badge: true }));
+console.log('Icons written to public/icons and android/app/src/main/res');

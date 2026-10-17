@@ -141,6 +141,23 @@ On Windows, Chrome or Edge offer **Install Hailey** from the address bar.
 
 ---
 
+## Windows app and Android app (GitHub Releases)
+
+Each release on the repository's **Releases** page has two downloads, built by GitHub Actions (`.github/workflows/release.yml`) whenever a tag such as `v1.0.1` is pushed:
+
+- **`Hailey-Setup-<version>.exe` (Windows).** A desktop app (Electron) that runs the Hailey server inside itself — no Node.js or commands needed. It opens Hailey in its own window and stays in the system tray so reminders keep working. Settings (AI keys, `PUBLIC_URL`) live in `%APPDATA%\Hailey\hailey.env`; open it from the tray menu → *Edit settings*, then choose *Restart Hailey*. Data is stored in `%APPDATA%\Hailey\data`. The tray menu can also **turn on phone access** by starting your ngrok tunnel (ngrok must be installed in `%LOCALAPPDATA%\ngrok` and connected to your account). The installer is not code-signed, so Windows SmartScreen asks you to confirm: *More info → Run anyway*. Don't run the desktop app and `npm start` at the same time — they share port 8787.
+- **`Hailey-<version>.apk` (Android).** A Trusted Web Activity that opens your Hailey address (the `HAILEY_URL` repository variable) full-screen, with Hailey's notifications appearing as app notifications. Install it by opening the file on the phone and allowing *Install unknown apps* for your browser. Your PC must be running Hailey with phone access on. For the full-screen view without an address bar, the server must publish `/.well-known/assetlinks.json` — set `ANDROID_PACKAGE_NAME=app.hailey.twa` and `ANDROID_CERT_SHA256` (the signing certificate fingerprint) in `.env`. If verification fails, the app still works with a thin address bar.
+
+**Android signing key.** The APK is signed in GitHub Actions with a key stored in the encrypted secrets `HAILEY_KEYSTORE_B64` and `HAILEY_KEYSTORE_PASSWORD`. Keep an offline backup of the key file — every future APK must be signed with the same key, or Android will refuse to update the installed app.
+
+To publish a new version:
+```bash
+git tag v1.0.1
+```
+```bash
+git push origin v1.0.1
+```
+
 ## Keeping Hailey running (hosting)
 
 Reminders and routines are sent by the server, so **the server must be running** for them to arrive on time.

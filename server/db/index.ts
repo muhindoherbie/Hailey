@@ -12,14 +12,14 @@ export type Row = Record<string, any>;
 export class Db {
   readonly raw: DatabaseSync;
 
-  constructor(path: string) {
+  constructor(path: string, migrationsDir = MIGRATIONS_DIR) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.raw = new DatabaseSync(path);
     this.raw.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-    this.migrate();
+    this.migrate(migrationsDir);
   }
 
-  private migrate() {
+  private migrate(MIGRATIONS_DIR: string) {
     this.raw.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`);
     const applied = new Set(this.all('SELECT name FROM schema_migrations').map((r) => r.name));

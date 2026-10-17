@@ -1,0 +1,43 @@
+{
+  "name": "hailey-desktop",
+  "productName": "Hailey",
+  "version": "1.0.0",
+  "description": "Hailey — personal AI assistant for Windows",
+  "author": "muhindoherbie",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "app.hailey.desktop",
+    "productName": "Hailey",
+    "copyright": "Copyright © 2026 muhindoherbie",
+    "directories": { "output": "release" },
+    "files": ["main.mjs", "package.json"],
+    "extraResources": [
+      { "from": "build", "to": "hailey" },
+      { "from": "icon.png", "to": "icon.png" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "icon.png",
+      "artifactName": "Hailey-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hailey",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
