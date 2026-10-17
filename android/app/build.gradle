@@ -14,6 +14,11 @@ android {
     namespace 'app.hailey.twa'
     compileSdk 36
 
+    // AGP 9 turns resValue off by default; the launch URL is injected through it.
+    buildFeatures {
+        resValues true
+    }
+
     defaultConfig {
         applicationId 'app.hailey.twa'
         minSdk 23
