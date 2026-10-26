@@ -121,6 +121,8 @@ jobs:
     needs: [windows, android]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with: { sparse-checkout: docs/release-notes }
       - uses: actions/download-artifact@v8
         with: { merge-multiple: true, path: out }
       - name: Publish release
@@ -138,5 +140,6 @@ jobs:
           Built from commit ${{ github.sha }}.
           EOF
           sed -i 's/^          //' notes.md
+          if [ -f "docs/release-notes/v$V.md" ]; then cat notes.md "docs/release-notes/v$V.md" > notes-full.md && mv notes-full.md notes.md; fi
           gh release create "v$V" out/* --repo "${{ github.repository }}" --title "Hailey $V" --notes-file notes.md --target "${{ github.sha }}" || \
             gh release upload "v$V" out/* --repo "${{ github.repository }}" --clobber

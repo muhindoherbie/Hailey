@@ -24,13 +24,13 @@ Accounts and sessions (scrypt, hashed tokens, CSRF header and Origin check, CSP)
 ## Incomplete or missing versus the 2.0 brief
 | Area | Status |
 |---|---|
-| Automatic complexity- and cost-based model routing | Not present. Only one provider per user, plus a fallback. Needs ≥2 configured providers to matter. |
+| Automatic complexity- and cost-based model routing | **Added** (opt-in, rule-based). |
 | Monthly usage limits | Only a daily limit existed. **Added** in this branch. |
-| Provider connection test or health endpoint | Not present. Configuration is reported, not liveness. |
-| Evening review, scheduled briefings | Routines exist. A dedicated evening review is not present. |
-| Task dependencies, deadline-conflict detection | Not present. |
-| External calendar (Google/Outlook) OAuth, Gmail, GitHub connectors | Not present. No credentials are available in this environment, so they were not built (rule: never invent a connection). |
-| Offline writes (IndexedDB queue, replay, conflicts) | Not present. Offline is read-only cache (`lib/cache`). |
+| Provider connection test or health endpoint | **Added.** |
+| Evening review, scheduled briefings | Both routines existed; the evening review was thin. **Improved.** |
+| Task dependencies, deadline-conflict detection | **Added.** |
+| External calendar (Google/Outlook) OAuth, Gmail, GitHub connectors | GitHub read-only **added**. Google and Gmail are interfaces only, pending OAuth credentials. |
+| Offline writes (IndexedDB queue, replay, conflicts) | **Added** for tasks, notes and projects. |
 | Semantic memory search | Not present. FTS5 only. No measurement yet justifies embeddings. |
 | Windows tray/startup-on-login, Android notification UX | Not audited at runtime (no Windows or Android device here). |
 

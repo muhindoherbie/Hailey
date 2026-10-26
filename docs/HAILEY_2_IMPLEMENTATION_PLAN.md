@@ -14,14 +14,21 @@ Ordered by value ÷ risk. Each step is a separate reviewable commit, and runs `n
 - [x] Phase 4: task dependencies (cycle-checked) and a workload view (`/api/tasks/workload`) flagging overloaded days and tasks due before what they depend on
 - [x] Phase 8: offline task creation, task edits and completion, and note edits. Uses an IndexedDB queue, op-id idempotency, version checks with 409 conflicts, and a conflict review UI
 
-## Next (no new credentials needed)
-1. GitHub read-only connector for public repos (optional `GITHUB_TOKEN` for private ones): repository summary, open issues and PRs, recent releases, exposed as read tools.
-2. Offline project updates (the server already supports versioned PATCH on projects).
-3. "Continue with Hailey" on projects: start a chat seeded with the project's tasks, notes and memories.
-4. A `check_workload` read tool so the assistant can use the workload and dependency data.
+- [x] Phase 5: "Continue with Hailey" on projects (already present in 1.x; verified)
+- [x] Phase 6: read-only GitHub connector (`github_repo_summary`), `check_workload` tool, and documented interfaces for Google Calendar, Gmail, RxPOS and Tutor Companion (`HAILEY_2_INTEGRATIONS.md`)
+- [x] Phase 7: optional Midnight palette (navy, emerald, cyan) in light and dark, meeting WCAG AA text contrast; Classic stays the default
+- [x] Phase 8: offline project edits
+- [x] Release prep: version 2.0.0, `docs/release-notes/v2.0.0.md` appended to the GitHub Release notes by `release.yml`
+
+## Release steps (owner)
+1. Merge the `hailey-2-upgrade` PR into `main` once CI is green.
+2. Back up the live server (`npm run backup`), then update it. Migrations 002–005 run automatically on start.
+3. Tag and push: `git tag v2.0.0 && git push origin v2.0.0`. `release.yml` builds and signs the Windows installer and the Android APK and publishes the release. It uses the existing `HAILEY_WIN_CERT_*` and Android signing secrets, so the signing identities are unchanged.
+
+**Rollback:** reinstall 1.0.0. The 2.0 migrations only add columns and tables, which 1.0 ignores, so data stays readable. Restore the backup only if something else went wrong.
 
 ## Needs your input or credentials
 - Google Calendar, Gmail, GitHub connectors: OAuth client IDs and secrets, plus a decision on hosting the redirect URL.
 - RxPOS and Tutor Companion: document their APIs before writing interface stubs.
 - Windows tray and startup-on-login: needs testing on a Windows machine.
-- UI palette refresh (Phase 7): confirm whether to replace the current brand colours or add the navy/teal theme as an option.
+- Whether Midnight should become the default palette (currently optional).
