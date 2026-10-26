@@ -15,6 +15,8 @@ export const settingsSchema = z.object({
     model: z.string().max(80).optional(),
     effort: z.enum(['low', 'medium', 'high']).default('medium'),
     dailyTokenLimit: z.number().int().min(0).max(50_000_000).optional(),
+    /** Rolling 30-day token cap; 0 or unset = no monthly limit. */
+    monthlyTokenLimit: z.number().int().min(0).max(1_500_000_000).optional(),
     /** Never send conversations to a cloud provider; fail visibly if no local model is available. */
     localOnly: z.boolean().default(false),
   }).default({ effort: 'medium', localOnly: false }),

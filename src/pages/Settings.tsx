@@ -129,6 +129,7 @@ function AI() {
   useEffect(() => {
     if (usage.data && s.dailyTokenLimit == null) setLimit(String(usage.data.dailyLimit));
   }, [usage.data, s.dailyTokenLimit]);
+  const [monthly, setMonthly] = useState(String(s.monthlyTokenLimit ?? 0));
   const u = usage.data;
   return (
     <>
@@ -159,10 +160,14 @@ function AI() {
           <div className="callout warning small" style={{ marginTop: 10 }}><Icon name="info" size={16} />No provider is configured. See the README section “Connect an AI model”.</div>
         )}
       </Card>
-      <Card title="Usage & limits" desc="Hailey stops sending AI requests once the 24-hour token limit is reached.">
+      <Card title="Usage & limits" desc="Hailey stops sending AI requests once the 24-hour or 30-day token limit is reached.">
         <Row label="Daily token limit" desc="0 = no limit">
           <input className="input" type="number" min={0} style={{ width: 160 }} value={limit} onChange={(e) => setLimit(e.target.value)} aria-label="Daily token limit" />
           <button className="btn sm" onClick={() => save({ ai: { dailyTokenLimit: Number(limit) || 0 } })}>Save</button>
+        </Row>
+        <Row label="Monthly token limit" desc="Rolling 30 days · 0 = no limit">
+          <input className="input" type="number" min={0} style={{ width: 160 }} value={monthly} onChange={(e) => setMonthly(e.target.value)} aria-label="Monthly token limit" />
+          <button className="btn sm" onClick={() => save({ ai: { monthlyTokenLimit: Number(monthly) || 0 } })}>Save</button>
         </Row>
         {usage.loading && !u ? <Loading rows={2} /> : u && (
           <>

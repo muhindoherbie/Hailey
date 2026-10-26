@@ -27,7 +27,8 @@ This describes how Hailey protects your data and where its limits are. No review
 ## The AI agent
 - Hailey acts only through a fixed registry of narrow, typed tools; there is no general computer, file-system, shell or browser access.
 - Every tool call is validated against its schema on the server before running. Tools run as the signed-in user and cannot reach other users' data.
-- **Consequential actions (deletions) are always queued** and run only after you approve them in the app, exactly once. You can switch any tool to *Ask me first* or *Off*; settings refuse to make consequential tools automatic.
+- **Consequential actions (deletions) are always queued** and run only after you approve them in the app, exactly once. You can switch any tool to *Ask me first* or *Off*; settings refuse to make consequential tools automatic. Each queued action is bound to a SHA-256 hash of the user, tool and exact arguments, and expires after 7 days; a changed or expired action is refused.
+- **Local-only mode** (Settings → AI) keeps conversations on a local model. Hailey never silently falls back from a chosen local model to a cloud provider.
 - Routines only produce summaries and notifications; they do not take actions.
 - Content from documents, web pages and search results is marked as untrusted, and the model is instructed not to follow instructions found inside it. This reduces, but cannot fully eliminate, prompt-injection risk — which is why consequential actions still require your approval.
 - The action history records what each action did (summary, tool, result status), not the full conversation.

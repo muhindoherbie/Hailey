@@ -337,6 +337,7 @@ export function dataRoutes() {
       byDay: db(c).all("SELECT substr(created_at,1,10) AS day, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost FROM usage WHERE user_id = ? AND created_at >= ? GROUP BY day ORDER BY day", uid(c), since),
       byModel: db(c).all('SELECT provider, model, SUM(input_tokens) AS input, SUM(output_tokens) AS output, SUM(cost_usd) AS cost FROM usage WHERE user_id = ? AND created_at >= ? GROUP BY provider, model', uid(c), since),
       dailyLimit: s.ai.dailyTokenLimit ?? c.var.services.config.DAILY_TOKEN_LIMIT,
+      monthlyLimit: s.ai.monthlyTokenLimit ?? 0,
       note: 'Costs are estimates from token counts and published list prices; your provider\'s billing dashboard is authoritative. Local models are counted at $0.',
     });
   });

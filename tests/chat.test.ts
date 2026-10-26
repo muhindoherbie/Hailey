@@ -183,6 +183,18 @@ describe('conversations', () => {
     expect(third.events.find((e) => e.event === 'error')!.data.message).toMatch(/daily AI usage limit/);
   });
 
+  it('enforces the rolling monthly token limit after the daily window resets', async () => {
+    const c = await signup(ctx);
+    await c.patch('/api/settings', { ai: { dailyTokenLimit: 0, monthlyTokenLimit: 100 } });
+    const conv = (await c.post('/api/conversations', {})).data;
+    ctx.provider.steps.push(() => text('one'));
+    await send(c, conv.id, { text: 'first' }); // 120 tokens
+    ctx.clock.now = new Date(ctx.clock.now.getTime() + 2 * 86400_000);
+    const second = await send(c, conv.id, { text: 'second' });
+    expect(second.events.find((e) => e.event === 'error')!.data.message).toMatch(/monthly AI usage limit/);
+    expect((await c.get('/api/usage')).data.monthlyLimit).toBe(100);
+  });
+
   it('chat without tools works for providers that lack tool support', async () => {
     const c = await signup(ctx);
     ctx.provider.tools = false;

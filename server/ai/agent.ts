@@ -78,8 +78,8 @@ function replayable(rows: Row[]): ChatMessage[] {
   return merged;
 }
 
-function usageToday(services: Services, userId: string, timeZone: string) {
-  const since = new Date(services.now().getTime() - 24 * 3600_000).toISOString();
+function usageToday(services: Services, userId: string, timeZone: string, hours = 24) {
+  const since = new Date(services.now().getTime() - hours * 3600_000).toISOString();
   return Number(services.db.get('SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n FROM usage WHERE user_id = ? AND created_at >= ?', userId, since)!.n);
 }
 
@@ -150,6 +150,10 @@ export async function runTurn(
   const limit = settings.ai.dailyTokenLimit ?? services.config.DAILY_TOKEN_LIMIT;
   if (limit > 0 && usageToday(services, user.id, settings.regional.timeZone) >= limit) {
     throw new ProviderError('rate_limited', `You have reached your daily AI usage limit (${limit.toLocaleString()} tokens in 24 hours). Raise it in Settings → AI, or try again later.`);
+  }
+  const monthly = settings.ai.monthlyTokenLimit ?? 0;
+  if (monthly > 0 && usageToday(services, user.id, settings.regional.timeZone, 30 * 24) >= monthly) {
+    throw new ProviderError('rate_limited', `You have reached your monthly AI usage limit (${monthly.toLocaleString()} tokens in 30 days). Raise it in Settings → AI, or try again later.`);
   }
 
   const ctx = makeContext(services, user.id, conversationId);
