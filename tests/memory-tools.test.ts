@@ -170,6 +170,28 @@ describe('tool registry and approvals', () => {
     expect((await alice.get(`/api/notes/${note.id}`)).status).toBe(200);
   });
 
+  it('binds approvals to the exact payload and refuses tampered ones', async () => {
+    const c = await signup(ctx);
+    const note = (await c.post('/api/notes', { title: 'Keep me' })).data;
+    const r = await executeTool('delete_note', { note_id: note.id }, makeContext(ctx.services, c.user.id, null));
+    const row = ctx.services.db.get('SELECT payload_hash, expires_at FROM actions WHERE id = ?', r.actionId!)!;
+    expect(row.payload_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.expires_at).toBeTruthy();
+    ctx.services.db.run('UPDATE actions SET input = ? WHERE id = ?', JSON.stringify({ note_id: 'someone-else' }), r.actionId!);
+    expect((await c.post(`/api/actions/${r.actionId}/approve`)).status).toBe(409);
+    expect((await c.get(`/api/notes/${note.id}`)).status).toBe(200);
+  });
+
+  it('expires stale approvals instead of running them', async () => {
+    const c = await signup(ctx);
+    const note = (await c.post('/api/notes', { title: 'Old request' })).data;
+    const r = await executeTool('delete_note', { note_id: note.id }, makeContext(ctx.services, c.user.id, null));
+    ctx.clock.now = new Date(ctx.clock.now.getTime() + 8 * 86400_000);
+    expect((await c.post(`/api/actions/${r.actionId}/approve`)).status).toBe(410);
+    expect((await c.get(`/api/notes/${note.id}`)).status).toBe(200);
+    expect((await c.post(`/api/actions/${r.actionId}/approve`)).status).toBe(409);
+  });
+
   it('honours permission settings: ask, off, and never auto for consequential tools', async () => {
     const c = await signup(ctx);
     await c.patch('/api/settings', { permissions: { autoReversible: false } });
