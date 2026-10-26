@@ -34,6 +34,7 @@ export default function Tasks() {
   if (priority) params.set('priority', priority);
   const { data, error, loading, stale, reload, setData } = useData<any>(`/tasks?${params}`, { cache: true });
   const projects = useData<any>('/projects?status=active', { cache: true });
+  const load = useData<any>('/tasks/workload?days=7');
   const focus = query.get('focus');
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function Tasks() {
           </select>
         </div>
         <StaleNote savedAt={stale} />
+        <WorkloadWarnings data={load.data} />
         <ErrorBox error={error} retry={reload} />
         {loading && !data ? <Loading rows={5} /> : view === 'calendar' ? (
           <CalendarView tasks={tasks} onOpen={setEditing} />
@@ -170,6 +172,23 @@ function ConfirmDraft({ draft, projects, onClose, onSaved }: { draft: any; proje
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Concrete planning conflicts from /tasks/workload: overloaded days and tasks due before what they depend on. */
+function WorkloadWarnings({ data }: { data: any }) {
+  if (!data) return null;
+  const over = data.days.filter((d: any) => d.overCapacity);
+  const deps = data.dependencyConflicts;
+  if (!over.length && !deps.length) return null;
+  return (
+    <div className="callout warning small" style={{ marginBottom: 12 }} role="status">
+      <Icon name="info" size={16} />
+      <div>
+        {over.map((d: any) => <div key={d.date}>{fmtDateTime(`${d.date}T12:00:00Z`, { time: false, weekday: true })}: about {Math.round(d.estimatedMinutes / 6) / 10} h estimated across {d.tasks} task{d.tasks === 1 ? '' : 's'} — more than {data.capacityMinutes / 60} h.</div>)}
+        {deps.map((x: any) => <div key={x.task_id + x.depends_on_id}>“{x.task_title}” is due before “{x.depends_on_title}”, which it depends on.</div>)}
+      </div>
+    </div>
   );
 }
 
@@ -281,6 +300,7 @@ export function TaskEditor({ task, projects, onClose, onSaved }: { task: any; pr
             <button className="btn" onClick={addSub}>Add</button>
           </div>
         </div>
+        <Dependencies task={task} />
         {task.history?.length > 0 && (
           <details>
             <summary className="small muted" style={{ cursor: 'pointer' }}>History</summary>
@@ -339,6 +359,39 @@ function CalendarView({ tasks, onOpen }: { tasks: any[]; onOpen: (t: any) => voi
         })}
       </div>
       <p className="faint tiny" style={{ marginTop: 10 }}>Shows your Hailey tasks only. To see them in Google/Outlook Calendar, enable the calendar feed in Settings.</p>
+    </div>
+  );
+}
+
+function Dependencies({ task }: { task: any }) {
+  const [deps, setDeps] = useState<{ depends_on: any[]; blocks: any[] }>({ depends_on: task.depends_on ?? [], blocks: task.blocks ?? [] });
+  const open = useData<any>('/tasks?view=all');
+  const [pick, setPick] = useState('');
+  const [err, setErr] = useState('');
+  const candidates = (open.data?.tasks ?? []).filter((t: any) => t.status === 'open' && t.id !== task.id && !deps.depends_on.some((d) => d.id === t.id));
+  const add = async () => {
+    if (!pick) return;
+    setErr('');
+    try { setDeps(await post(`/tasks/${task.id}/dependencies`, { depends_on_id: pick })); setPick(''); } catch (e: any) { setErr(e?.message ?? 'Could not add'); }
+  };
+  return (
+    <div>
+      <div className="label" style={{ marginBottom: 6 }}>Depends on</div>
+      {deps.depends_on.map((d) => (
+        <div key={d.id} className="row small" style={{ marginBottom: 4 }}>
+          <span className={`badge ${d.status === 'done' ? 'success' : ''}`}>{d.status === 'done' ? 'done' : 'open'}</span>{d.title}
+          <button className="btn sm ghost" aria-label={`Remove dependency on ${d.title}`} onClick={async () => setDeps(await del(`/tasks/${task.id}/dependencies/${d.id}`))}>Remove</button>
+        </div>
+      ))}
+      <div className="row">
+        <select className="select" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Add a dependency">
+          <option value="">Choose a task this depends on…</option>
+          {candidates.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
+        </select>
+        <button className="btn" onClick={add} disabled={!pick}>Add</button>
+      </div>
+      {err && <span className="hint" role="alert">{err}</span>}
+      {deps.blocks.length > 0 && <p className="hint">Blocks: {deps.blocks.map((b) => b.title).join(', ')}</p>}
     </div>
   );
 }
