@@ -8,6 +8,7 @@ export interface AISettings {
   provider?: string;
   model?: string;
   effort?: Effort;
+  localOnly?: boolean;
 }
 
 /** Holds every configured provider and resolves the one a user has selected. */
@@ -27,15 +28,27 @@ export class ProviderRegistry {
     return [...this.providers.values()].map((p) => p.info());
   }
 
-  /** Picks the user's chosen provider, falling back to the first configured one. */
+  /**
+   * Picks the user's chosen provider, falling back to the first configured one.
+   * Never falls back from a local model to a cloud one: that would silently send
+   * data the user chose to keep on their own machine to a third party.
+   */
   resolve(settings: AISettings = {}): AIProvider {
+    const chosen = settings.provider ? this.providers.get(settings.provider)?.info() : undefined;
+    const localOnly = !!settings.localOnly || (!!chosen?.capabilities.local && !chosen.configured);
     const order = [settings.provider, this.defaultId, ...this.providers.keys()].filter(Boolean) as string[];
     for (const id of order) {
       const p = this.providers.get(id);
-      if (p && p.info().configured) {
+      if (p && p.info().configured && (!localOnly || p.info().capabilities.local)) {
         if (p instanceof AnthropicProvider) return p.withSettings(id === settings.provider ? settings.model : undefined, settings.effort);
         return p;
       }
+    }
+    if (localOnly && this.hasAny()) {
+      throw new ProviderError(
+        'unavailable',
+        `No local model is available, and Hailey will not send this to a cloud provider without your permission. Start your local model, or turn off local-only mode / choose ${this.list().filter((p) => p.configured).map((p) => p.label).join(' or ')} in Settings → AI.`,
+      );
     }
     throw new ProviderError(
       'not_configured',

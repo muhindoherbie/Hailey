@@ -15,7 +15,9 @@ export const settingsSchema = z.object({
     model: z.string().max(80).optional(),
     effort: z.enum(['low', 'medium', 'high']).default('medium'),
     dailyTokenLimit: z.number().int().min(0).max(50_000_000).optional(),
-  }).default({ effort: 'medium' }),
+    /** Never send conversations to a cloud provider; fail visibly if no local model is available. */
+    localOnly: z.boolean().default(false),
+  }).default({ effort: 'medium', localOnly: false }),
   memory: z.object({
     enabled: z.boolean().default(true),
     /** explicit: only when the user asks; ask: every assistant-initiated memory needs approval; ask_sensitive: approval for sensitive or inferred only. */

@@ -123,7 +123,8 @@ function AI() {
   const usage = useData<any>('/usage');
   const s = me!.settings.ai;
   const providers = me!.server.providers;
-  const active = providers.find((p) => p.id === s.provider && p.configured) ?? providers.find((p) => p.configured);
+  const usable = providers.filter((p) => p.configured && (!s.localOnly || p.capabilities.local));
+  const active = usable.find((p) => p.id === s.provider) ?? usable[0];
   const [limit, setLimit] = useState(String(s.dailyTokenLimit ?? usage.data?.dailyLimit ?? ''));
   useEffect(() => {
     if (usage.data && s.dailyTokenLimit == null) setLimit(String(usage.data.dailyLimit));
@@ -151,6 +152,9 @@ function AI() {
             </Row>
           </>
         )}
+        <Row label="Local-only mode" desc="Keep conversations on your own machine. If no local model is available, Hailey stops and tells you instead of using a cloud provider.">
+          <Switch label="Local-only mode" checked={!!s.localOnly} onChange={(v) => save({ ai: { localOnly: v } }, v ? 'Local-only mode on' : 'Local-only mode off')} />
+        </Row>
         {!providers.some((p) => p.configured) && (
           <div className="callout warning small" style={{ marginTop: 10 }}><Icon name="info" size={16} />No provider is configured. See the README section “Connect an AI model”.</div>
         )}
