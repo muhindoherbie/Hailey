@@ -19,7 +19,9 @@ export const settingsSchema = z.object({
     monthlyTokenLimit: z.number().int().min(0).max(1_500_000_000).optional(),
     /** Never send conversations to a cloud provider; fail visibly if no local model is available. */
     localOnly: z.boolean().default(false),
-  }).default({ effort: 'medium', localOnly: false }),
+    /** Choose between a local and a cloud model per message (see ProviderRegistry.route). */
+    autoRoute: z.boolean().default(false),
+  }).default({ effort: 'medium', localOnly: false, autoRoute: false }),
   memory: z.object({
     enabled: z.boolean().default(true),
     /** explicit: only when the user asks; ask: every assistant-initiated memory needs approval; ask_sensitive: approval for sensitive or inferred only. */

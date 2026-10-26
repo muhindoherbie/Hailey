@@ -58,3 +58,28 @@ describe('provider connection test', () => {
     expect(r[0]).toMatchObject({ ok: false, kind: 'auth', error: 'Invalid API key.' });
   });
 });
+
+describe('automatic routing', () => {
+  const sig = (text: string, extra: Partial<{ attachments: number; historyChars: number; sensitive: string | null }> = {}) =>
+    ({ text, attachments: 0, historyChars: 0, sensitive: null, ...extra });
+
+  it('is off by default and then behaves like resolve()', () => {
+    expect(registry(true).route({ provider: 'cloud' }, sig('hi')).provider.info().id).toBe('cloud');
+  });
+
+  it('keeps sensitive and everyday turns local, sends complex work to the cloud', () => {
+    const r = registry(true);
+    const on = { provider: 'cloud', autoRoute: true };
+    expect(r.route(on, sig('what is on today?')).provider.info().id).toBe('ollama');
+    expect(r.route(on, sig('my blood pressure readings', { sensitive: 'health' })).reason).toMatch(/sensitive/);
+    expect(r.route(on, sig('my blood pressure readings', { sensitive: 'health' })).provider.info().id).toBe('ollama');
+    expect(r.route(on, sig('Analyze last month’s pharmacy sales')).provider.info().id).toBe('cloud');
+    expect(r.route(on, sig('see file', { attachments: 1 })).provider.info().id).toBe('cloud');
+    expect(r.route(on, sig('ok', { historyChars: 50_000 })).provider.info().id).toBe('cloud');
+  });
+
+  it('falls back to the selected model when only one kind is available, and respects local-only', () => {
+    expect(registry(false).route({ autoRoute: true }, sig('Analyze this')).provider.info().id).toBe('cloud');
+    expect(registry(true).route({ autoRoute: true, localOnly: true }, sig('Analyze this')).provider.info().id).toBe('ollama');
+  });
+});

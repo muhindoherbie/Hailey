@@ -6,7 +6,7 @@ import type { ChatMessage, Block, ToolUseBlock, ToolResultBlock } from './types.
 import { ProviderError, textOf } from './types.ts';
 import { toolSpecs, executeTool, makeContext, type ToolContext } from '../tools/registry.ts';
 import { getSettings, type Settings } from '../services/settings.ts';
-import { retrieveMemories } from '../services/memory.ts';
+import { retrieveMemories, sensitivityOf } from '../services/memory.ts';
 import { documentText } from '../services/documents.ts';
 import { formatLocal, localDate, localClock, safeTimeZone } from '../services/time.ts';
 import { indexEntity } from '../services/indexer.ts';
@@ -145,7 +145,10 @@ export async function runTurn(
   const conv = db.getOwned('conversations', user.id, conversationId);
   if (!conv) throw new HttpError(404, 'Conversation not found', 'not_found');
   const settings = getSettings(db, user.id);
-  const provider = services.providers.resolve(settings.ai);
+  const prior = Number(db.get('SELECT COALESCE(SUM(LENGTH(content)), 0) AS n FROM messages WHERE conversation_id = ? AND user_id = ?', conversationId, user.id)!.n);
+  const { provider, reason: routeReason } = services.providers.route(settings.ai, {
+    text: userText, attachments: opts.attachments?.length ?? 0, historyChars: prior, sensitive: sensitivityOf(userText),
+  });
   const info = provider.info();
   const limit = settings.ai.dailyTokenLimit ?? services.config.DAILY_TOKEN_LIMIT;
   if (limit > 0 && usageToday(services, user.id, settings.regional.timeZone) >= limit) {
@@ -169,7 +172,7 @@ export async function runTurn(
     const title = userText.replace(/\s+/g, ' ').trim().slice(0, 60) + (userText.length > 60 ? '…' : '');
     db.run('UPDATE conversations SET title = ? WHERE id = ?', title, conversationId);
   }
-  opts.emit({ type: 'start', userMessage: { ...userMsg, meta: { attachments } }, provider: { id: info.id, label: info.label, model: info.model } });
+  opts.emit({ type: 'start', userMessage: { ...userMsg, meta: { attachments } }, provider: { id: info.id, label: info.label, model: info.model, reason: routeReason } });
 
   const system = conv.system_prompt || buildSystemPrompt(user, settings);
   if (!conv.system_prompt) db.run('UPDATE conversations SET system_prompt = ? WHERE id = ?', system, conversationId);
@@ -199,7 +202,7 @@ export async function runTurn(
     assistantRow = db.insert('messages', {
       user_id: user.id, conversation_id: conversationId, role: 'assistant', content: text,
       api_content: JSON.stringify(result.content),
-      meta: JSON.stringify({ provider: info.id, model: result.model, stop: result.stopReason, usage: result.usage }),
+      meta: JSON.stringify({ provider: info.id, model: result.model, stop: result.stopReason, usage: result.usage, route: routeReason }),
     });
     messages.push({ role: 'assistant', content: result.content });
     if (result.stopReason === 'refusal') {

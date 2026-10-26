@@ -172,6 +172,9 @@ function AI() {
             <Icon name={h.ok ? 'check' : 'info'} size={16} />{h.label}: {h.ok ? `connected · ${h.model} · ${h.latencyMs} ms` : h.error}
           </div>
         ))}
+        <Row label="Automatic model choice" desc="When both a local and a cloud model are set up, Hailey keeps sensitive and everyday messages on the local model and sends complex work (documents, analysis, long chats) to the cloud model. Hover a reply’s model name to see why it was chosen.">
+          <Switch label="Automatic model choice" checked={!!s.autoRoute} disabled={!!s.localOnly} onChange={(v) => save({ ai: { autoRoute: v } }, v ? 'Automatic model choice on' : 'Automatic model choice off')} />
+        </Row>
         <Row label="Local-only mode" desc="Keep conversations on your own machine. If no local model is available, Hailey stops and tells you instead of using a cloud provider.">
           <Switch label="Local-only mode" checked={!!s.localOnly} onChange={(v) => save({ ai: { localOnly: v } }, v ? 'Local-only mode on' : 'Local-only mode off')} />
         </Row>
