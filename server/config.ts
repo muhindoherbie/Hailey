@@ -32,6 +32,10 @@ const schema = z.object({
   SEARXNG_URL: z.string().optional(),
   BRAVE_SEARCH_API_KEY: z.string().optional(),
 
+  // GitHub (read-only). Public repos work without a token; a fine-grained read-only token adds private repos.
+  GITHUB_TOKEN: z.string().optional(),
+  GITHUB_API_URL: z.string().default('https://api.github.com'),
+
   // Web push (generate with `npm run setup`)
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
