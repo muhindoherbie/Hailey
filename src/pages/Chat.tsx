@@ -407,7 +407,7 @@ function MessageView({ m }: { m: Msg }) {
             </button>
           )}
           <SaveAsNote text={m.content} />
-          {meta.model && <span className="faint tiny" style={{ alignSelf: 'center', marginLeft: 6 }}>{meta.model}</span>}
+          {meta.model && <span className="faint tiny" style={{ alignSelf: 'center', marginLeft: 6 }} title={meta.route ? `Why this model: ${meta.route}` : undefined}>{meta.model}</span>}
         </div>
       </div>
     </div>

@@ -123,11 +123,22 @@ function AI() {
   const usage = useData<any>('/usage');
   const s = me!.settings.ai;
   const providers = me!.server.providers;
-  const active = providers.find((p) => p.id === s.provider && p.configured) ?? providers.find((p) => p.configured);
+  const usable = providers.filter((p) => p.configured && (!s.localOnly || p.capabilities.local));
+  const active = usable.find((p) => p.id === s.provider) ?? usable[0];
   const [limit, setLimit] = useState(String(s.dailyTokenLimit ?? usage.data?.dailyLimit ?? ''));
   useEffect(() => {
     if (usage.data && s.dailyTokenLimit == null) setLimit(String(usage.data.dailyLimit));
   }, [usage.data, s.dailyTokenLimit]);
+  const [monthly, setMonthly] = useState(String(s.monthlyTokenLimit ?? 0));
+  const [health, setHealth] = useState<{ busy: boolean; results?: any[] }>({ busy: false });
+  const testProviders = async () => {
+    setHealth({ busy: true });
+    try {
+      setHealth({ busy: false, results: (await post<any>('/ai/test', {})).results });
+    } catch (e: any) {
+      setHealth({ busy: false, results: [{ id: 'error', label: 'Connection test', ok: false, error: e?.message ?? 'Failed' }] });
+    }
+  };
   const u = usage.data;
   return (
     <>
@@ -151,14 +162,34 @@ function AI() {
             </Row>
           </>
         )}
+        {providers.some((p) => p.configured) && (
+          <Row label="Connection test" desc="Sends a tiny test prompt (no personal data) to each configured provider. Uses a few tokens.">
+            <button className="btn sm" disabled={health.busy} onClick={testProviders}>{health.busy ? 'Testing…' : 'Test connection'}</button>
+          </Row>
+        )}
+        {health.results?.map((h) => (
+          <div key={h.id} className={`callout ${h.ok ? 'success' : 'warning'} small`} style={{ marginTop: 6 }} role="status">
+            <Icon name={h.ok ? 'check' : 'info'} size={16} />{h.label}: {h.ok ? `connected · ${h.model} · ${h.latencyMs} ms` : h.error}
+          </div>
+        ))}
+        <Row label="Automatic model choice" desc="When both a local and a cloud model are set up, Hailey keeps sensitive and everyday messages on the local model and sends complex work (documents, analysis, long chats) to the cloud model. Hover a reply’s model name to see why it was chosen.">
+          <Switch label="Automatic model choice" checked={!!s.autoRoute} disabled={!!s.localOnly} onChange={(v) => save({ ai: { autoRoute: v } }, v ? 'Automatic model choice on' : 'Automatic model choice off')} />
+        </Row>
+        <Row label="Local-only mode" desc="Keep conversations on your own machine. If no local model is available, Hailey stops and tells you instead of using a cloud provider.">
+          <Switch label="Local-only mode" checked={!!s.localOnly} onChange={(v) => save({ ai: { localOnly: v } }, v ? 'Local-only mode on' : 'Local-only mode off')} />
+        </Row>
         {!providers.some((p) => p.configured) && (
           <div className="callout warning small" style={{ marginTop: 10 }}><Icon name="info" size={16} />No provider is configured. See the README section “Connect an AI model”.</div>
         )}
       </Card>
-      <Card title="Usage & limits" desc="Hailey stops sending AI requests once the 24-hour token limit is reached.">
+      <Card title="Usage & limits" desc="Hailey stops sending AI requests once the 24-hour or 30-day token limit is reached.">
         <Row label="Daily token limit" desc="0 = no limit">
           <input className="input" type="number" min={0} style={{ width: 160 }} value={limit} onChange={(e) => setLimit(e.target.value)} aria-label="Daily token limit" />
           <button className="btn sm" onClick={() => save({ ai: { dailyTokenLimit: Number(limit) || 0 } })}>Save</button>
+        </Row>
+        <Row label="Monthly token limit" desc="Rolling 30 days · 0 = no limit">
+          <input className="input" type="number" min={0} style={{ width: 160 }} value={monthly} onChange={(e) => setMonthly(e.target.value)} aria-label="Monthly token limit" />
+          <button className="btn sm" onClick={() => save({ ai: { monthlyTokenLimit: Number(monthly) || 0 } })}>Save</button>
         </Row>
         {usage.loading && !u ? <Loading rows={2} /> : u && (
           <>
@@ -319,7 +350,7 @@ function Notifications() {
       </Card>
       <Card title="Routines" desc="Scheduled summaries built from your real data. Routines only notify you — they never take actions on their own.">
         {routines.data?.routines.map((r: any) => (
-          <Row key={r.id} label={r.kind === 'morning_briefing' ? 'Morning briefing' : 'Evening review'} desc={r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed today and what’s due tomorrow.'}>
+          <Row key={r.id} label={r.kind === 'morning_briefing' ? 'Morning briefing' : 'Evening review'} desc={<>{r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed, what’s still open, project progress and tomorrow’s priorities.'}{r.last_run_at && <> · Last run {fmtDateTime(r.last_run_at)}: {r.last_status === 'failed' ? <span className="badge danger">failed</span> : 'ok'}</>}</>}>
             <input type="time" className="input" style={{ width: 120 }} defaultValue={r.time_local} onBlur={async (e) => { if (e.target.value && e.target.value !== r.time_local) { await patch(`/routines/${r.id}`, { time_local: e.target.value }); toast('Time saved'); routines.reload(); } }} aria-label="Routine time" />
             <Switch label={`Enable ${r.kind}`} checked={r.enabled} onChange={async (v) => { await patch(`/routines/${r.id}`, { enabled: v }); routines.reload(); }} />
           </Row>
@@ -336,6 +367,7 @@ function Appearance() {
   return (
     <Card title="Appearance & accessibility">
       <Row label="Theme"><Seg label="Theme" value={a.theme} onChange={(v) => save({ appearance: { theme: v } })} options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} /></Row>
+      <Row label="Colour palette" desc="Classic is Hailey’s original look. Midnight uses deep navy surfaces with emerald and cyan accents."><Seg label="Colour palette" value={a.palette ?? 'classic'} onChange={(v) => save({ appearance: { palette: v } })} options={[{ value: 'classic', label: 'Classic' }, { value: 'midnight', label: 'Midnight' }]} /></Row>
       <Row label="Text size"><Seg label="Text size" value={a.textSize} onChange={(v) => save({ appearance: { textSize: v } })} options={[{ value: 'normal', label: 'Normal' }, { value: 'large', label: 'Large' }]} /></Row>
       <Row label="Reduce motion" desc="Turns off animations."><Switch label="Reduce motion" checked={a.reduceMotion} onChange={(v) => save({ appearance: { reduceMotion: v } })} /></Row>
       <div className="callout small" style={{ marginTop: 12 }}>
@@ -447,7 +479,7 @@ function Privacy() {
     <>
       <Card title="Your data" desc="Everything is stored in the SQLite database and uploads folder on your Hailey server. Nothing is sold or shared. AI requests send the relevant conversation, retrieved memories and attached document text to the AI provider you configured.">
         <Row label="Export all data" desc="A JSON file with your tasks, notes, projects, memories, conversations and settings."><a className="btn sm" href="/api/export" download><Icon name="download" size={14} />Download export</a></Row>
-        <Row label="Offline copy on this device" desc="Pages you open are cached on this device for offline reading. Signing out clears it."><span className="badge">Read-only</span></Row>
+        <Row label="Offline copy on this device" desc="Pages you open are cached for offline reading. New tasks, task edits and note edits made offline are queued here and synced when you reconnect; conflicts are shown for review. Signing out clears both."><span className="badge">Read + queued edits</span></Row>
         <Row label="Sync" desc="All devices read and write the same server, so changes appear everywhere after a refresh. Offline edits are not queued — make changes when online."><span className="badge success">Server-based</span></Row>
       </Card>
       <Card title="Signed-in devices">

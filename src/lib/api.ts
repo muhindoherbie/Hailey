@@ -21,8 +21,8 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal } = {}): Promise<T> {
-  const headers: Record<string, string> = { 'x-hailey': '1', ...TUNNEL_HEADERS };
+export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal; headers?: Record<string, string> } = {}): Promise<T> {
+  const headers: Record<string, string> = { ...opts.headers, 'x-hailey': '1', ...TUNNEL_HEADERS };
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
   else if (opts.body !== undefined) {
@@ -41,7 +41,9 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   const data = type.includes('application/json') ? await res.json().catch(() => ({})) : await res.text();
   if (!res.ok) {
     const d = data as any;
-    throw new ApiError(res.status, d?.error ?? `Request failed (${res.status})`, d?.code, d?.retryable ?? res.status >= 500);
+    const e = new ApiError(res.status, d?.error ?? `Request failed (${res.status})`, d?.code, d?.retryable ?? res.status >= 500);
+    (e as any).data = d;
+    throw e;
   }
   return data as T;
 }

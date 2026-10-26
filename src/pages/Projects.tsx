@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { Empty, ErrorBox, Loading, Modal, StaleNote, useConfirm, useToast } from '../components/ui';
 import { useData } from '../lib/hooks';
 import { del, patch, post } from '../lib/api';
+import { isQueued, writeOrQueue } from '../lib/sync';
 import { Link, navigate, useLocation } from '../lib/router';
 import { fmtDateTime } from '../lib/format';
 
@@ -76,9 +77,16 @@ export function ProjectForm({ project, workspaces, defaultWs, onClose, onSaved }
   const save = async () => {
     try {
       const body = { ...f, deadline: f.deadline ? new Date(`${f.deadline}T12:00:00Z`).toISOString() : null, workspace_id: f.workspace_id || null };
-      const p = project ? await patch(`/projects/${project.id}`, body) : await post('/projects', body);
-      toast(project ? 'Project saved' : 'Project created');
-      onSaved(p);
+      const p: any = project
+        ? await writeOrQueue('PATCH', `/projects/${project.id}`, body, { label: `Edit to project “${f.name}”`, entity: `projects:${project.id}`, base: project.updated_at })
+        : await post('/projects', body);
+      if (isQueued(p)) {
+        toast('Saved on this device — it will sync when you’re back online');
+        onSaved({ ...project, ...body });
+      } else {
+        toast(project ? 'Project saved' : 'Project created');
+        onSaved(p);
+      }
       onClose();
     } catch (e: any) {
       toast(e.message, 'error');

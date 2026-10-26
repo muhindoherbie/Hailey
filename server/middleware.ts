@@ -89,3 +89,47 @@ export function clientIp(c: any): string {
   }
   return c.env?.incoming?.socket?.remoteAddress ?? 'local';
 }
+
+const VERSIONED = /^\/api\/(tasks|notes|projects)\/([A-Za-z0-9_-]{1,64})$/;
+
+/**
+ * Safe replay for writes queued offline. A request carrying `X-Op-Id` runs at most once per user:
+ * a repeat returns the stored response. `X-Base-Version` (the record's `updated_at` when the user
+ * edited it) turns a PATCH into a conditional update that returns 409 if the record changed since.
+ * Runs after requireAuth, so replays get the same authentication, CSRF and validation as live calls.
+ */
+export const offlineReplay: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const opId = c.req.header('x-op-id');
+  if (c.req.method === 'GET' || !opId) return next();
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(opId)) throw new HttpError(400, 'Invalid operation id', 'validation');
+  const { db } = c.var.services;
+  const userId = c.var.user.id;
+  const claimed = db.run('INSERT OR IGNORE INTO client_ops (user_id, op_id) VALUES (?, ?)', userId, opId);
+  if (Number(claimed.changes) === 0) {
+    const prior = db.get('SELECT status, response FROM client_ops WHERE user_id = ? AND op_id = ?', userId, opId)!;
+    if (!prior.status) throw new HttpError(409, 'This change is already being saved.', 'in_progress');
+    c.header('X-Op-Replayed', '1');
+    return c.body(prior.response, prior.status, { 'content-type': 'application/json' });
+  }
+  try {
+    const base = c.req.header('x-base-version');
+    const target = c.req.method === 'PATCH' ? VERSIONED.exec(c.req.path) : null;
+    if (base && target) {
+      const row = db.getOwned(target[1], userId, target[2]);
+      if (row && row.updated_at !== base) {
+        db.run('DELETE FROM client_ops WHERE user_id = ? AND op_id = ?', userId, opId);
+        return c.json({ error: 'This item was changed elsewhere since you edited it offline.', code: 'version_conflict', current: row }, 409);
+      }
+    }
+    await next();
+  } catch (err) {
+    db.run('DELETE FROM client_ops WHERE user_id = ? AND op_id = ?', userId, opId);
+    throw err;
+  }
+  if (c.res.status < 300) {
+    db.run('UPDATE client_ops SET status = ?, response = ? WHERE user_id = ? AND op_id = ?', c.res.status, await c.res.clone().text(), userId, opId);
+  } else {
+    // Failed writes are not recorded, so the client may retry them.
+    db.run('DELETE FROM client_ops WHERE user_id = ? AND op_id = ?', userId, opId);
+  }
+};

@@ -283,3 +283,66 @@ export function listTasks(
   );
   return rows.map(presentTask);
 }
+
+// ---------- Dependencies & workload ----------
+
+/** Records that `taskId` depends on `dependsOnId`. Both must be the user's, and cycles are refused. */
+export function addDependency(db: Db, userId: string, taskId: string, dependsOnId: string) {
+  if (!db.getOwned('tasks', userId, taskId)) throw notFound('Task');
+  if (!db.getOwned('tasks', userId, dependsOnId)) throw notFound('Task');
+  if (taskId === dependsOnId) throw badRequest('A task cannot depend on itself.');
+  // Walk what dependsOnId (transitively) depends on; reaching taskId would form a cycle.
+  const seen = new Set<string>();
+  const stack = [dependsOnId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === taskId) throw badRequest('That would create a circular dependency.');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const r of db.all('SELECT depends_on_id FROM task_dependencies WHERE task_id = ? AND user_id = ?', id, userId)) stack.push(r.depends_on_id);
+  }
+  db.run('INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_id, user_id) VALUES (?, ?, ?)', taskId, dependsOnId, userId);
+  history(db, userId, taskId, 'dependency added');
+  return listDependencies(db, userId, taskId);
+}
+
+export function removeDependency(db: Db, userId: string, taskId: string, dependsOnId: string) {
+  const r = db.run('DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_id = ? AND user_id = ?', taskId, dependsOnId, userId);
+  if (Number(r.changes) === 0) throw notFound('Dependency');
+  history(db, userId, taskId, 'dependency removed');
+  return listDependencies(db, userId, taskId);
+}
+
+export function listDependencies(db: Db, userId: string, taskId: string) {
+  const cols = 't.id, t.title, t.status, t.due_at, t.priority';
+  return {
+    depends_on: db.all(`SELECT ${cols} FROM task_dependencies d JOIN tasks t ON t.id = d.depends_on_id WHERE d.task_id = ? AND d.user_id = ? ORDER BY t.due_at`, taskId, userId),
+    blocks: db.all(`SELECT ${cols} FROM task_dependencies d JOIN tasks t ON t.id = d.task_id WHERE d.depends_on_id = ? AND d.user_id = ? ORDER BY t.due_at`, taskId, userId),
+  };
+}
+
+/**
+ * Planned load per local day from open tasks' due dates and estimates, plus concrete conflicts:
+ * days over capacity, and tasks due before a task they depend on.
+ */
+export function workload(db: Db, userId: string, dayBounds: { date: string; start: string; end: string }[], capacityMinutes: number) {
+  const days = dayBounds.map((d) => {
+    const rows = db.all(
+      "SELECT id, title, estimate_minutes FROM tasks WHERE user_id = ? AND status = 'open' AND due_at >= ? AND due_at < ? ORDER BY priority, due_at",
+      userId, d.start, d.end,
+    );
+    const minutes = rows.reduce((a, t) => a + (t.estimate_minutes ?? 0), 0);
+    return {
+      date: d.date, tasks: rows.length, estimatedMinutes: minutes,
+      unestimated: rows.filter((t) => !t.estimate_minutes).length, overCapacity: minutes > capacityMinutes,
+    };
+  });
+  const dependencyConflicts = db.all(
+    `SELECT a.id AS task_id, a.title AS task_title, a.due_at AS task_due, b.id AS depends_on_id, b.title AS depends_on_title, b.due_at AS depends_on_due
+     FROM task_dependencies d JOIN tasks a ON a.id = d.task_id JOIN tasks b ON b.id = d.depends_on_id
+     WHERE d.user_id = ? AND a.status = 'open' AND b.status = 'open' AND a.due_at IS NOT NULL AND b.due_at IS NOT NULL AND b.due_at > a.due_at
+     ORDER BY a.due_at LIMIT 50`,
+    userId,
+  );
+  return { capacityMinutes, days, dependencyConflicts };
+}

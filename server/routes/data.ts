@@ -42,7 +42,7 @@ export function dataRoutes() {
     return c.json({
       overview: o,
       briefing: briefingText(o, s.profile.displayName || c.var.user.name, hour),
-      suggestions: suggestions(o, db(c), uid(c)),
+      suggestions: suggestions(o, db(c), uid(c), now()),
       recentConversations, recentWork, notifications,
       hour,
     });
@@ -159,6 +159,23 @@ export function dataRoutes() {
       needsConfirmation: !p || p.ambiguities.length > 0 || wantsReminder,
     });
   });
+  r.get('/tasks/workload', (c) => {
+    const s = getSettings(db(c), uid(c));
+    const tz = safeTimeZone(s.regional.timeZone);
+    const q = z.object({ days: z.coerce.number().int().min(1).max(31).default(7), capacity: z.coerce.number().int().min(30).max(1440).default(480) })
+      .parse({ days: c.req.query('days') ?? undefined, capacity: c.req.query('capacity') ?? undefined });
+    const today = localDate(c.var.services.now(), tz);
+    const bounds = Array.from({ length: q.days }, (_, i) => {
+      const d = addDays(today, i);
+      return { date: d, start: startOfLocalDay(d, tz).toISOString(), end: startOfLocalDay(addDays(d, 1), tz).toISOString() };
+    });
+    return c.json(tasks.workload(db(c), uid(c), bounds, q.capacity));
+  });
+  r.post('/tasks/:id/dependencies', async (c) => {
+    const { depends_on_id } = z.object({ depends_on_id: z.string().max(64) }).parse(await body(c));
+    return c.json(tasks.addDependency(db(c), uid(c), c.req.param('id'), depends_on_id));
+  });
+  r.delete('/tasks/:id/dependencies/:depId', (c) => c.json(tasks.removeDependency(db(c), uid(c), c.req.param('id'), c.req.param('depId'))));
   r.get('/tasks/:id', (c) => {
     const t = db(c).getOwned('tasks', uid(c), c.req.param('id'));
     if (!t) throw notFound('Task');
@@ -167,6 +184,7 @@ export function dataRoutes() {
       subtasks: db(c).all('SELECT * FROM tasks WHERE parent_id = ? AND user_id = ? ORDER BY status, sort, created_at', t.id, uid(c)).map(tasks.presentTask),
       history: db(c).all('SELECT change, created_at FROM task_history WHERE task_id = ? ORDER BY created_at DESC LIMIT 50', t.id),
       reminders: db(c).all('SELECT * FROM reminders WHERE task_id = ? AND user_id = ? ORDER BY remind_at', t.id, uid(c)),
+      ...tasks.listDependencies(db(c), uid(c), t.id),
     });
   });
   r.patch('/tasks/:id', async (c) => c.json(tasks.updateTask(db(c), uid(c), c.req.param('id'), await body(c))));
@@ -183,7 +201,8 @@ export function dataRoutes() {
   // ---------- Reminders ----------
   r.get('/reminders', (c) => c.json({
     reminders: db(c).all(
-      "SELECT * FROM reminders WHERE user_id = ? AND (status IN ('scheduled','sending') OR remind_at > datetime('now','-7 days')) ORDER BY remind_at", uid(c),
+      "SELECT * FROM reminders WHERE user_id = ? AND (status IN ('scheduled','sending') OR remind_at > ?) ORDER BY remind_at", uid(c),
+      new Date(c.var.services.now().getTime() - 7 * 86400_000).toISOString(),
     ),
   }));
   r.post('/reminders', async (c) => {
@@ -336,6 +355,7 @@ export function dataRoutes() {
       byDay: db(c).all("SELECT substr(created_at,1,10) AS day, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost FROM usage WHERE user_id = ? AND created_at >= ? GROUP BY day ORDER BY day", uid(c), since),
       byModel: db(c).all('SELECT provider, model, SUM(input_tokens) AS input, SUM(output_tokens) AS output, SUM(cost_usd) AS cost FROM usage WHERE user_id = ? AND created_at >= ? GROUP BY provider, model', uid(c), since),
       dailyLimit: s.ai.dailyTokenLimit ?? c.var.services.config.DAILY_TOKEN_LIMIT,
+      monthlyLimit: s.ai.monthlyTokenLimit ?? 0,
       note: 'Costs are estimates from token counts and published list prices; your provider\'s billing dashboard is authoritative. Local models are counted at $0.',
     });
   });
@@ -344,7 +364,7 @@ export function dataRoutes() {
   r.get('/export', (c) => {
     const u = uid(c);
     const d = db(c);
-    const tables = ['workspaces', 'projects', 'project_items', 'tasks', 'reminders', 'notes', 'memories', 'conversations', 'routines', 'actions', 'activity', 'links'];
+    const tables = ['workspaces', 'projects', 'project_items', 'tasks', 'task_dependencies', 'reminders', 'notes', 'memories', 'conversations', 'routines', 'actions', 'activity', 'links'];
     const data: Record<string, unknown> = { exported_at: new Date().toISOString(), format: 'hailey-export-v1', user: c.var.user, settings: getSettings(d, u) };
     for (const t of tables) data[t] = d.all(`SELECT * FROM ${t} WHERE user_id = ?`, u);
     data.messages = d.all("SELECT id, conversation_id, role, content, created_at FROM messages WHERE user_id = ? AND role IN ('user','assistant')", u);

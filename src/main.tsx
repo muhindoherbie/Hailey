@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { App } from './App';
+import { startSync } from './lib/sync';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -15,3 +16,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => console.warn('Service worker registration failed', err));
   });
 }
+
+// Replay task/note changes made offline once the connection returns.
+startSync();

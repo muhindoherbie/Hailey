@@ -15,7 +15,13 @@ export const settingsSchema = z.object({
     model: z.string().max(80).optional(),
     effort: z.enum(['low', 'medium', 'high']).default('medium'),
     dailyTokenLimit: z.number().int().min(0).max(50_000_000).optional(),
-  }).default({ effort: 'medium' }),
+    /** Rolling 30-day token cap; 0 or unset = no monthly limit. */
+    monthlyTokenLimit: z.number().int().min(0).max(1_500_000_000).optional(),
+    /** Never send conversations to a cloud provider; fail visibly if no local model is available. */
+    localOnly: z.boolean().default(false),
+    /** Choose between a local and a cloud model per message (see ProviderRegistry.route). */
+    autoRoute: z.boolean().default(false),
+  }).default({ effort: 'medium', localOnly: false, autoRoute: false }),
   memory: z.object({
     enabled: z.boolean().default(true),
     /** explicit: only when the user asks; ask: every assistant-initiated memory needs approval; ask_sensitive: approval for sensitive or inferred only. */
@@ -38,7 +44,9 @@ export const settingsSchema = z.object({
     theme: z.enum(['system', 'light', 'dark']).default('system'),
     textSize: z.enum(['normal', 'large']).default('normal'),
     reduceMotion: z.boolean().default(false),
-  }).default({ theme: 'system', textSize: 'normal', reduceMotion: false }),
+    /** classic = the original Hailey colours; midnight = navy surfaces with emerald/cyan accents. */
+    palette: z.enum(['classic', 'midnight']).default('classic'),
+  }).default({ theme: 'system', textSize: 'normal', reduceMotion: false, palette: 'classic' }),
   voice: z.object({
     enabled: z.boolean().default(true),
     language: z.string().max(20).default('en-US'),

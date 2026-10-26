@@ -3,9 +3,10 @@ import { Shell } from '../components/Shell';
 import { Icon } from '../components/Icon';
 import { ErrorBox, Loading, Markdown, Modal, StaleNote, useConfirm, useToast } from '../components/ui';
 import { useData } from '../lib/hooks';
-import { api, del, patch, post } from '../lib/api';
+import { api, del, post } from '../lib/api';
 import { Link, navigate, useLocation } from '../lib/router';
 import { relative } from '../lib/format';
+import { isQueued, writeOrQueue } from '../lib/sync';
 
 export default function NoteEditor({ id }: { id: string }) {
   const toast = useToast();
@@ -15,13 +16,17 @@ export default function NoteEditor({ id }: { id: string }) {
   const projects = useData<any>('/projects?status=active');
   const [note, setNote] = useState<any>(null);
   const [mode, setMode] = useState<'edit' | 'preview'>(query.get('fresh') ? 'edit' : 'preview');
-  const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'offline' | 'error'>('idle');
   const [linking, setLinking] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef<any>(null);
+  const base = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (data && !note) setNote({ ...data, tagsText: data.tags.join(', ') });
+    if (data && !note) {
+      setNote({ ...data, tagsText: data.tags.join(', ') });
+      base.current = data.updated_at;
+    }
   }, [data, note]);
 
   // Autosave shortly after typing stops.
@@ -37,11 +42,15 @@ export default function NoteEditor({ id }: { id: string }) {
     const n = latest.current;
     if (!n) return;
     try {
-      await patch(`/notes/${id}`, {
+      const r: any = await writeOrQueue('PATCH', `/notes/${id}`, {
         title: n.title.trim() || 'Untitled note', body: n.body, folder: n.folder, kind: n.kind, pinned: n.pinned,
         tags: n.tagsText.split(',').map((t: string) => t.trim()).filter(Boolean), project_id: n.project_id || null,
-      });
-      setSaving('saved');
+      }, { label: `Edit to note “${n.title.trim() || 'Untitled note'}”`, entity: `notes:${id}`, base: base.current });
+      if (isQueued(r)) setSaving('offline');
+      else {
+        base.current = r?.updated_at ?? base.current;
+        setSaving('saved');
+      }
     } catch (e: any) {
       setSaving('error');
       toast(e.message, 'error');
@@ -60,7 +69,7 @@ export default function NoteEditor({ id }: { id: string }) {
   return (
     <Shell title={<Link to="/knowledge" className="muted">Knowledge</Link>} actions={
       <>
-        <span className="faint small" aria-live="polite">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : saving === 'error' ? 'Not saved' : ''}</span>
+        <span className="faint small" aria-live="polite">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : saving === 'offline' ? 'Saved on this device' : saving === 'error' ? 'Not saved' : ''}</span>
         <div className="seg">
           <button className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')}>Edit</button>
           <button className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')}>Read</button>

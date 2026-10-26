@@ -5,6 +5,7 @@ import { useSession } from '../lib/session';
 import { useOnline, useDebounced } from '../lib/hooks';
 import { api } from '../lib/api';
 import { Modal } from './ui';
+import { resolveOp, setSyncUser, syncQueue, useSyncState } from '../lib/sync';
 
 const NAV = [
   { to: '/', label: 'Home', icon: 'home', key: '1' },
@@ -27,6 +28,11 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
   const update = useSwUpdate();
 
   useEffect(() => setMenu(false), [pathname]);
+  useEffect(() => {
+    if (!me?.user.id) return;
+    setSyncUser(me.user.id);
+    if (online) void syncQueue();
+  }, [me?.user.id, online]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement)?.tagName) || (e.target as HTMLElement)?.isContentEditable;
@@ -86,8 +92,9 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
 
       <div className="main">
         {(!online || offlineSession) && (
-          <div className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved notes, tasks and projects you opened before are available read-only; AI, research, sync and reminders need a connection.</div>
+          <div className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved notes, tasks and projects you opened before are available. New tasks and edits to tasks and notes are kept on this device and sync when you reconnect; AI, research and reminders need a connection.</div>
         )}
+        <SyncStatus />
         {update.available && (
           <div className="banner update" role="status">A new version of Hailey is ready. <button className="btn sm primary" onClick={update.apply}>Update</button></div>
         )}
@@ -212,4 +219,42 @@ function useSwUpdate() {
     });
   }, []);
   return { available: !!reg, apply: () => reg?.waiting?.postMessage({ type: 'SKIP_WAITING' }) };
+}
+
+/** Shows queued offline changes and lets the user resolve conflicts the server reported. */
+function SyncStatus() {
+  const s = useSyncState();
+  const [open, setOpen] = useState(false);
+  const problems = [...s.conflicts, ...s.failed];
+  if (!s.pending && !problems.length) return null;
+  return (
+    <>
+      <div className={`banner ${problems.length ? 'offline' : 'update'}`} role="status">
+        <Icon name={problems.length ? 'alert' : 'refresh'} size={16} />
+        {s.pending > 0 && <span>{s.syncing ? 'Syncing' : 'Waiting to sync'} {s.pending} change{s.pending === 1 ? '' : 's'} made offline.</span>}
+        {problems.length > 0 && (
+          <>
+            <span>{problems.length} change{problems.length === 1 ? '' : 's'} could not be synced.</span>
+            <button className="btn sm" onClick={() => setOpen(true)}>Review</button>
+          </>
+        )}
+      </div>
+      {open && (
+        <Modal title="Offline changes to review" onClose={() => setOpen(false)}>
+          <ul className="list">
+            {problems.map((op) => (
+              <li key={op.id} style={{ padding: '8px 0' }}>
+                <div><strong>{op.label}</strong></div>
+                <div className="small muted">{op.status === 'conflict' ? 'This item was changed elsewhere after you edited it offline.' : op.error}</div>
+                <div className="row" style={{ marginTop: 6 }}>
+                  <button className="btn sm" onClick={() => void resolveOp(op, 'discard')}>Discard my change</button>
+                  {op.status === 'conflict' && <button className="btn sm primary" onClick={() => void resolveOp(op, 'overwrite')}>Keep my change</button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Modal>
+      )}
+    </>
+  );
 }

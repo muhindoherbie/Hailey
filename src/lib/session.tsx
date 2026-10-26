@@ -34,6 +34,8 @@ export function applyAppearance(s: any) {
   if (theme === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', theme);
   root.setAttribute('data-text', s?.appearance?.textSize ?? 'normal');
+  if (s?.appearance?.palette === 'midnight') root.setAttribute('data-palette', 'midnight');
+  else root.removeAttribute('data-palette');
   if (s?.appearance?.reduceMotion) root.setAttribute('data-motion', 'reduce');
   else root.removeAttribute('data-motion');
 }
