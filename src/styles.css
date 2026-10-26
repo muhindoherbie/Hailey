@@ -106,6 +106,72 @@
   --shadow-3: 0 24px 64px -12px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
 }
+/* Optional "Midnight" palette (Settings → Appearance): deep navy surfaces with emerald and cyan accents.
+   The classic palette above stays the default, so existing branding is unchanged. */
+:root[data-palette='midnight'] {
+  --bg: #f4f7fb;
+  --bg-sunken: #e9eef5;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #dde4ee;
+  --border-strong: #c8d2e0;
+  --text: #0B1220;
+  --text-2: #475569;
+  --text-3: #64748b;
+  --brand: #0f766e;
+  --brand-hover: #115e59;
+  --brand-soft: #e0f5f2;
+  --brand-text: #0f766e;
+  --on-brand: #ffffff;
+  --accent: #0284c7;
+  --accent-soft: #e0f2fe;
+  --info-soft: #e6f0fb;
+  --focus: #0ea5e9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='midnight']:not([data-theme='light']) {
+    --bg: #0B1220;
+    --bg-sunken: #080d18;
+    --surface: #151F30;
+    --surface-2: #1C2A3D;
+    --border: #24344b;
+    --border-strong: #33465f;
+    --text: #F8FAFC;
+    --text-2: #94A3B8;
+    --text-3: #8291a7;
+    --brand: #14B8A6;
+    --brand-hover: #2dd4bf;
+    --brand-soft: #0f2e33;
+    --brand-text: #5eead4;
+    --on-brand: #042f2a;
+    --accent: #38BDF8;
+    --accent-soft: #0c2a3d;
+    --info-soft: #11233a;
+    --focus: #38BDF8;
+    color-scheme: dark;
+  }
+}
+:root[data-palette='midnight'][data-theme='dark'] {
+--bg: #0B1220;
+  --bg-sunken: #080d18;
+  --surface: #151F30;
+  --surface-2: #1C2A3D;
+  --border: #24344b;
+  --border-strong: #33465f;
+  --text: #F8FAFC;
+  --text-2: #94A3B8;
+  --text-3: #8291a7;
+  --brand: #14B8A6;
+  --brand-hover: #2dd4bf;
+  --brand-soft: #0f2e33;
+  --brand-text: #5eead4;
+  --on-brand: #042f2a;
+  --accent: #38BDF8;
+  --accent-soft: #0c2a3d;
+  --info-soft: #11233a;
+  --focus: #38BDF8;
+  color-scheme: dark;
+}
 :root[data-text='large'] { --fs: 17px; }
 :root[data-motion='reduce'] *, :root[data-motion='reduce'] *::before, :root[data-motion='reduce'] *::after {
   animation-duration: 0.001ms !important; transition-duration: 0.001ms !important;

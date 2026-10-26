@@ -44,7 +44,9 @@ export const settingsSchema = z.object({
     theme: z.enum(['system', 'light', 'dark']).default('system'),
     textSize: z.enum(['normal', 'large']).default('normal'),
     reduceMotion: z.boolean().default(false),
-  }).default({ theme: 'system', textSize: 'normal', reduceMotion: false }),
+    /** classic = the original Hailey colours; midnight = navy surfaces with emerald/cyan accents. */
+    palette: z.enum(['classic', 'midnight']).default('classic'),
+  }).default({ theme: 'system', textSize: 'normal', reduceMotion: false, palette: 'classic' }),
   voice: z.object({
     enabled: z.boolean().default(true),
     language: z.string().max(20).default('en-US'),

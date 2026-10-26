@@ -367,6 +367,7 @@ function Appearance() {
   return (
     <Card title="Appearance & accessibility">
       <Row label="Theme"><Seg label="Theme" value={a.theme} onChange={(v) => save({ appearance: { theme: v } })} options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} /></Row>
+      <Row label="Colour palette" desc="Classic is Hailey’s original look. Midnight uses deep navy surfaces with emerald and cyan accents."><Seg label="Colour palette" value={a.palette ?? 'classic'} onChange={(v) => save({ appearance: { palette: v } })} options={[{ value: 'classic', label: 'Classic' }, { value: 'midnight', label: 'Midnight' }]} /></Row>
       <Row label="Text size"><Seg label="Text size" value={a.textSize} onChange={(v) => save({ appearance: { textSize: v } })} options={[{ value: 'normal', label: 'Normal' }, { value: 'large', label: 'Large' }]} /></Row>
       <Row label="Reduce motion" desc="Turns off animations."><Switch label="Reduce motion" checked={a.reduceMotion} onChange={(v) => save({ appearance: { reduceMotion: v } })} /></Row>
       <div className="callout small" style={{ marginTop: 12 }}>
