@@ -7,7 +7,7 @@ import { ZodError } from 'zod';
 import type { AppEnv, Services } from './context.ts';
 import { HttpError } from './context.ts';
 import { ProviderError } from './ai/types.ts';
-import { securityHeaders, csrfGuard, requireAuth, rateLimit, clientIp } from './middleware.ts';
+import { securityHeaders, csrfGuard, requireAuth, rateLimit, clientIp, offlineReplay } from './middleware.ts';
 import { authRoutes } from './routes/auth.ts';
 import { dataRoutes } from './routes/data.ts';
 import { chatRoutes } from './routes/chat.ts';
@@ -62,6 +62,7 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
   api.route('/auth', authRoutes());
   const priv = new Hono<AppEnv>();
   priv.use('*', requireAuth);
+  priv.use('*', offlineReplay);
   priv.route('/', dataRoutes());
   priv.route('/', chatRoutes());
   priv.route('/', fileRoutes());

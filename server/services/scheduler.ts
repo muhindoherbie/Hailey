@@ -123,6 +123,7 @@ export function startScheduler(services: Services, intervalMs = 30_000) {
       await runRoutines(services);
       expireMemories(services.db, services.now());
       services.db.run('DELETE FROM sessions WHERE expires_at < ?', services.now().toISOString());
+      services.db.run('DELETE FROM client_ops WHERE created_at < ?', new Date(services.now().getTime() - 30 * 86400_000).toISOString());
     } catch (err) {
       console.error('[scheduler]', err);
     } finally {

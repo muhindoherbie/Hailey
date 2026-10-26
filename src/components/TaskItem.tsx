@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
 import { post } from '../lib/api';
+import { isQueued, writeOrQueue } from '../lib/sync';
 import { dueLabel } from '../lib/format';
 import { useToast } from './ui';
 
@@ -13,11 +14,17 @@ export function TaskItem({ task, onChanged, onOpen, showProject = true }: { task
   const toggle = async () => {
     setBusy(true);
     try {
+      const opts = { label: `${done ? 'Reopen' : 'Complete'} “${task.title}”`, entity: `tasks:${task.id}` };
       if (done) {
-        const t = await post(`/tasks/${task.id}/reopen`);
-        onChanged?.(t);
+        const t = await writeOrQueue('POST', `/tasks/${task.id}/reopen`, {}, opts);
+        onChanged?.(isQueued(t) ? { ...task, status: 'open' } : t);
       } else {
-        const r = await post(`/tasks/${task.id}/complete`);
+        const r: any = await writeOrQueue('POST', `/tasks/${task.id}/complete`, {}, opts);
+        if (isQueued(r)) {
+          onChanged?.({ ...task, status: 'done' });
+          toast('Completed on this device — it will sync when you’re back online');
+          return;
+        }
         onChanged?.(r.task);
         toast(r.next ? `Done. Next occurrence scheduled.` : `Completed “${task.title}”`, 'info', {
           label: 'Undo',

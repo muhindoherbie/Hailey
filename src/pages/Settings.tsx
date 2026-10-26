@@ -475,7 +475,7 @@ function Privacy() {
     <>
       <Card title="Your data" desc="Everything is stored in the SQLite database and uploads folder on your Hailey server. Nothing is sold or shared. AI requests send the relevant conversation, retrieved memories and attached document text to the AI provider you configured.">
         <Row label="Export all data" desc="A JSON file with your tasks, notes, projects, memories, conversations and settings."><a className="btn sm" href="/api/export" download><Icon name="download" size={14} />Download export</a></Row>
-        <Row label="Offline copy on this device" desc="Pages you open are cached on this device for offline reading. Signing out clears it."><span className="badge">Read-only</span></Row>
+        <Row label="Offline copy on this device" desc="Pages you open are cached for offline reading. New tasks, task edits and note edits made offline are queued here and synced when you reconnect; conflicts are shown for review. Signing out clears both."><span className="badge">Read + queued edits</span></Row>
         <Row label="Sync" desc="All devices read and write the same server, so changes appear everywhere after a refresh. Offline edits are not queued — make changes when online."><span className="badge success">Server-based</span></Row>
       </Card>
       <Card title="Signed-in devices">

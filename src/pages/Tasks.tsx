@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import { TaskItem } from '../components/TaskItem';
 import { Empty, ErrorBox, Loading, Modal, StaleNote, Switch, useConfirm, useToast } from '../components/ui';
 import { useData, useDebounced } from '../lib/hooks';
-import { del, patch, post, get } from '../lib/api';
+import { del, patch, post, get, isOffline } from '../lib/api';
+import { isQueued, writeOrQueue } from '../lib/sync';
 import { navigate, useLocation } from '../lib/router';
 import { fmtDateTime, fromLocalInput, localDay, toLocalInput, getPrefs } from '../lib/format';
 
@@ -109,6 +110,13 @@ function QuickAdd({ onCreated, projects }: { onCreated: () => void; projects: an
     if (!text.trim()) return;
     setBusy(true);
     try {
+      // Offline: date parsing needs the server, so save the text as a plain task to sync later.
+      if (isOffline()) {
+        await writeOrQueue('POST', '/tasks', { title: text.trim().slice(0, 300) }, { label: `New task “${text.trim().slice(0, 60)}”` });
+        toast('Saved on this device — it will sync when you’re back online');
+        setText('');
+        return;
+      }
       const r = await post('/tasks/parse', { text });
       if (!r.needsConfirmation) {
         await post('/tasks', r.draft);
@@ -209,15 +217,15 @@ export function TaskEditor({ task, projects, onClose, onSaved }: { task: any; pr
   const save = async () => {
     setBusy(true);
     try {
-      await patch(`/tasks/${task.id}`, {
+      const saved = await writeOrQueue('PATCH', `/tasks/${task.id}`, {
         title: f.title, description: f.description, priority: Number(f.priority), category: f.category,
         tags: f.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
         due_at: fromLocalInput(f.due), all_day: f.all_day, estimate_minutes: f.estimate ? Number(f.estimate) : null,
         project_id: f.project_id || null,
         recurrence: f.recurrence ? { freq: f.recurrence, interval: Number(f.interval) || 1 } : null,
         ...(remindAt ? { remind_at: fromLocalInput(remindAt) } : {}),
-      });
-      toast('Task saved');
+      }, { label: `Edit to “${f.title}”`, entity: `tasks:${task.id}`, base: task.updated_at });
+      toast(isQueued(saved) ? 'Saved on this device — it will sync when you’re back online' : 'Task saved');
       onSaved();
       onClose();
     } catch (e: any) {
