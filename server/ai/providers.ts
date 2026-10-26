@@ -24,6 +24,10 @@ export class ProviderRegistry {
     this.defaultId = id;
   }
 
+  get(id: string): AIProvider | undefined {
+    return this.providers.get(id);
+  }
+
   list(): ProviderInfo[] {
     return [...this.providers.values()].map((p) => p.info());
   }

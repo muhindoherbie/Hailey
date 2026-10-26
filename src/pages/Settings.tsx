@@ -130,6 +130,15 @@ function AI() {
     if (usage.data && s.dailyTokenLimit == null) setLimit(String(usage.data.dailyLimit));
   }, [usage.data, s.dailyTokenLimit]);
   const [monthly, setMonthly] = useState(String(s.monthlyTokenLimit ?? 0));
+  const [health, setHealth] = useState<{ busy: boolean; results?: any[] }>({ busy: false });
+  const testProviders = async () => {
+    setHealth({ busy: true });
+    try {
+      setHealth({ busy: false, results: (await post<any>('/ai/test', {})).results });
+    } catch (e: any) {
+      setHealth({ busy: false, results: [{ id: 'error', label: 'Connection test', ok: false, error: e?.message ?? 'Failed' }] });
+    }
+  };
   const u = usage.data;
   return (
     <>
@@ -153,6 +162,16 @@ function AI() {
             </Row>
           </>
         )}
+        {providers.some((p) => p.configured) && (
+          <Row label="Connection test" desc="Sends a tiny test prompt (no personal data) to each configured provider. Uses a few tokens.">
+            <button className="btn sm" disabled={health.busy} onClick={testProviders}>{health.busy ? 'Testing…' : 'Test connection'}</button>
+          </Row>
+        )}
+        {health.results?.map((h) => (
+          <div key={h.id} className={`callout ${h.ok ? 'success' : 'warning'} small`} style={{ marginTop: 6 }} role="status">
+            <Icon name={h.ok ? 'check' : 'info'} size={16} />{h.label}: {h.ok ? `connected · ${h.model} · ${h.latencyMs} ms` : h.error}
+          </div>
+        ))}
         <Row label="Local-only mode" desc="Keep conversations on your own machine. If no local model is available, Hailey stops and tells you instead of using a cloud provider.">
           <Switch label="Local-only mode" checked={!!s.localOnly} onChange={(v) => save({ ai: { localOnly: v } }, v ? 'Local-only mode on' : 'Local-only mode off')} />
         </Row>

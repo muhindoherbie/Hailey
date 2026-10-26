@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { setup, signup, text, type TestCtx } from './helpers.ts';
 import { ProviderRegistry } from '../server/ai/providers.ts';
 import { ProviderError, type AIProvider } from '../server/ai/types.ts';
 
@@ -32,5 +33,28 @@ describe('provider routing privacy', () => {
 
   it('keeps the existing fallback between configured providers otherwise', () => {
     expect(registry(false).resolve({}).info().id).toBe('cloud');
+  });
+});
+
+
+describe('provider connection test', () => {
+  let ctx: TestCtx;
+  beforeEach(() => (ctx = setup()));
+  afterEach(() => ctx.cleanup());
+
+  it('reports a working provider with latency and records the tokens it used', async () => {
+    const c = await signup(ctx);
+    ctx.provider.steps.push(() => text('OK'));
+    const r = (await c.post('/api/ai/test', {})).data.results;
+    expect(r).toEqual([expect.objectContaining({ id: 'fake', ok: true, model: 'fake-1' })]);
+    expect(typeof r[0].latencyMs).toBe('number');
+    expect((await c.get('/api/usage')).data.last24h.input).toBe(100);
+  });
+
+  it('reports provider errors without throwing', async () => {
+    const c = await signup(ctx);
+    ctx.provider.steps.push(() => { throw new ProviderError('auth', 'Invalid API key.'); });
+    const r = (await c.post('/api/ai/test', {})).data.results;
+    expect(r[0]).toMatchObject({ ok: false, kind: 'auth', error: 'Invalid API key.' });
   });
 });

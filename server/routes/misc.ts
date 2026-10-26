@@ -5,7 +5,8 @@ import type { AppEnv } from '../context.ts';
 import { HttpError } from '../context.ts';
 import { sha256 } from '../auth.ts';
 import { rateLimit } from '../middleware.ts';
-import { complete } from '../ai/agent.ts';
+import { complete, recordUsage } from '../ai/agent.ts';
+import { ProviderError } from '../ai/types.ts';
 import { SearchUnavailableError } from '../services/search.ts';
 
 /** Research (live web search + optional AI synthesis), push subscriptions and calendar feed. */
@@ -13,6 +14,30 @@ export function miscRoutes() {
   const r = new Hono<AppEnv>();
   const uid = (c: any) => c.var.user.id as string;
   const db = (c: any) => c.var.services.db as AppEnv['Variables']['services']['db'];
+
+  // ---------- AI provider health ----------
+  /** Sends a tiny fixed prompt (no user data) to each configured provider and reports latency or the error. */
+  r.post('/ai/test', rateLimit({ name: 'aitest', windowMs: 60_000, max: 6, key: (c) => c.var.user.id }), async (c) => {
+    const { providers, now } = c.var.services;
+    const body = z.object({ provider: z.string().max(40).optional() }).parse(await c.req.json().catch(() => ({})));
+    const targets = providers.list().filter((p) => p.configured && (!body.provider || p.id === body.provider));
+    const results = await Promise.all(targets.map(async (info) => {
+      const started = performance.now();
+      try {
+        const res = await providers.get(info.id)!.chat({
+          system: 'You are a connection test. Reply with the single word OK.',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'ping' }] }],
+          tools: [], maxTokens: 256, signal: AbortSignal.timeout(20_000),
+        });
+        recordUsage(c.var.services, uid(c), info.id, res.model, res.usage, info.pricing, 'health_check');
+        return { id: info.id, label: info.label, model: res.model, ok: true, latencyMs: Math.round(performance.now() - started) };
+      } catch (err: any) {
+        const pe = err instanceof ProviderError ? err : null;
+        return { id: info.id, label: info.label, model: info.model, ok: false, kind: pe?.kind ?? (err?.name === 'TimeoutError' ? 'unavailable' : 'error'), error: pe?.message ?? (err?.name === 'TimeoutError' ? 'No response within 20 seconds.' : 'Connection failed.') };
+      }
+    }));
+    return c.json({ results, testedAt: now().toISOString() });
+  });
 
   // ---------- Research ----------
   r.get('/research/status', (c) => c.json(c.var.services.search.available()));
