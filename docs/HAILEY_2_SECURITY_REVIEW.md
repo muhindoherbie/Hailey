@@ -8,6 +8,10 @@ The baseline controls are documented in `docs/SECURITY.md` and were verified in 
 | Approval bound to exact arguments | Stored input was re-validated, but not integrity-checked | SHA-256 payload hash checked at approval (409 on mismatch) |
 | Approval expiry | None | 7 days (410, then cancelled) |
 | Cloud egress when a local model is chosen | Silent fallback to a cloud provider possible | Blocked with an explicit error; optional local-only mode |
+| Auto-routing | — | Opt-in; sensitive messages are kept local; local-only mode overrides it |
+| Offline replay | — | Replays use the same session, CSRF, Zod validation and owner scoping; op ids are per user; queued ops are tagged with the user and only replayed for that user; deletions and AI actions are never queued; the queue is cleared on sign-out |
+| Routine failures | Silent, and could skip other users' routines | Recorded per routine and notified |
+| Connection test | — | Sends a fixed prompt with no user data; rate-limited (6/min) |
 
 ## Remaining risks
 - Prompt injection: mitigated, not eliminated. Approvals stay the backstop.

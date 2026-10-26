@@ -8,13 +8,17 @@ Ordered by value ÷ risk. Each step is a separate reviewable commit, and runs `n
 - [x] Phase 10: bind approvals to the user, tool and arguments with a SHA-256 payload hash; 7-day expiry; tamper and expiry tests
 - [x] Phase 1.1: privacy-safe routing. No silent local→cloud fallback; local-only mode in Settings → AI; routing tests
 - [x] Phase 1.2: rolling 30-day (monthly) token limit in Settings → AI, enforced before each turn
+- [x] Phase 1.2: provider connection test (`POST /api/ai/test`), showing latency and errors in Settings → AI
+- [x] Phase 1.1: opt-in automatic model choice (local for sensitive and everyday turns, cloud for complex work), with the reason shown per reply
+- [x] Phase 3/4: richer evening review (completed, still open, project progress, tomorrow's priorities); routine runs record `last_status`/`last_error`, and one failure no longer stops other routines
+- [x] Phase 4: task dependencies (cycle-checked) and a workload view (`/api/tasks/workload`) flagging overloaded days and tasks due before what they depend on
+- [x] Phase 8: offline task creation, task edits and completion, and note edits. Uses an IndexedDB queue, op-id idempotency, version checks with 409 conflicts, and a conflict review UI
 
-## Next (highest value, no new credentials needed)
-1. **Provider health check:** `POST /api/ai/test` performs a 1-token call per provider and shows latency and errors in Settings → AI.
-2. **Evening review routine:** reuse `buildOverview` and the routine scheduler. Completed vs unfinished tasks come from real rows only.
-3. **Task dependencies:** additive `task_dependencies` table and a blocked-by badge. Deadline-conflict warning when the summed estimates for a day exceed working hours.
-4. **Offline write queue (Phase 8):** IndexedDB op log with client `op_id` and `If-Match: updated_at` version checks. The server dedupes on `op_id` and returns 409 on version mismatch. Tasks and notes come first, and replays go through the same auth and approval paths.
-5. **Rule-based routing:** route by tool need, context size and local-only. Only useful once two providers are configured.
+## Next (no new credentials needed)
+1. GitHub read-only connector for public repos (optional `GITHUB_TOKEN` for private ones): repository summary, open issues and PRs, recent releases, exposed as read tools.
+2. Offline project updates (the server already supports versioned PATCH on projects).
+3. "Continue with Hailey" on projects: start a chat seeded with the project's tasks, notes and memories.
+4. A `check_workload` read tool so the assistant can use the workload and dependency data.
 
 ## Needs your input or credentials
 - Google Calendar, Gmail, GitHub connectors: OAuth client IDs and secrets, plus a decision on hosting the redirect URL.
