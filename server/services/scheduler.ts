@@ -2,7 +2,7 @@ import type { Services } from '../context.ts';
 import { notify } from './activity.ts';
 import { getSettings } from './settings.ts';
 import { localClock, localDate, safeTimeZone } from './time.ts';
-import { buildOverview, briefingText } from './briefing.ts';
+import { buildOverview, briefingText, eveningReviewText } from './briefing.ts';
 import { expireMemories } from './memory.ts';
 import { parseJson } from '../db/index.ts';
 
@@ -83,22 +83,30 @@ export async function runRoutines(services: Services) {
     }
     const claim = db.run('UPDATE routines SET last_run_on = ? WHERE id = ? AND (last_run_on IS NULL OR last_run_on != ?)', today, r.id, today);
     if (Number(claim.changes) === 0) continue;
-    const user = db.get('SELECT name FROM users WHERE id = ?', r.user_id);
-    const o = buildOverview(db, r.user_id, now, tz, r.kind === 'evening_review' ? 1 : 0, settings.regional.locale);
-    let title: string;
-    let body: string;
-    if (r.kind === 'evening_review') {
-      title = 'Evening review';
-      body = `Completed today: ${o.completedToday.length}. Still open from today: ${o.overdue.length}. Tomorrow: ${o.due.length} task(s) due. Open Hailey to plan tomorrow.`;
-    } else {
-      title = 'Your morning briefing';
-      body = briefingText(o, settings.profile.displayName || user?.name || '', h);
+    try {
+      const user = db.get('SELECT name FROM users WHERE id = ?', r.user_id);
+      const o = buildOverview(db, r.user_id, now, tz, 0, settings.regional.locale);
+      let title: string;
+      let body: string;
+      if (r.kind === 'evening_review') {
+        title = 'Evening review';
+        body = eveningReviewText(o, buildOverview(db, r.user_id, now, tz, 1, settings.regional.locale));
+      } else {
+        title = 'Your morning briefing';
+        body = briefingText(o, settings.profile.displayName || user?.name || '', h);
+      }
+      notify(db, r.user_id, { kind: 'routine', title, body, link: '/' });
+      if (settings.notifications.push && services.push.configured()) {
+        await services.push.sendToUser(r.user_id, { title, body: body.slice(0, 240), url: '/', tag: `routine-${r.kind}` }).catch(() => undefined);
+      }
+      ran++;
+      db.run("UPDATE routines SET last_run_at = ?, last_status = 'ok', last_error = NULL WHERE id = ?", now.toISOString(), r.id);
+    } catch (err: any) {
+      // One failing routine must not stop the others; record and surface the failure.
+      console.error('[routine]', r.kind, err?.message ?? err);
+      db.run("UPDATE routines SET last_run_at = ?, last_status = 'failed', last_error = ? WHERE id = ?", now.toISOString(), String(err?.message ?? err).slice(0, 300), r.id);
+      notify(db, r.user_id, { kind: 'action_failed', title: 'A routine failed', body: `Your ${r.kind === 'evening_review' ? 'evening review' : 'morning briefing'} could not be prepared.`, link: '/settings' });
     }
-    notify(db, r.user_id, { kind: 'routine', title, body, link: '/' });
-    if (settings.notifications.push && services.push.configured()) {
-      await services.push.sendToUser(r.user_id, { title, body: body.slice(0, 240), url: '/', tag: `routine-${r.kind}` }).catch(() => undefined);
-    }
-    ran++;
   }
   return ran;
 }

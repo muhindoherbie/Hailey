@@ -104,6 +104,28 @@ export function briefingText(o: Overview, name: string, hourLocal: number): stri
   return lines.join(' ');
 }
 
+/**
+ * Evening review written from today's and tomorrow's overviews by code.
+ * Unfinished = due today and still open (older overdue items are counted separately).
+ */
+export function eveningReviewText(today: Overview, tomorrow: Overview): string {
+  const done = today.completedToday;
+  const lines: string[] = [];
+  lines.push(done.length
+    ? `You completed ${done.length} task${done.length === 1 ? '' : 's'} today: ${done.slice(0, 3).map((t: any) => t.title).join('; ')}${done.length > 3 ? '…' : ''}.`
+    : 'No tasks were marked complete today.');
+  if (today.due.length) lines.push(`${today.due.length} task${today.due.length === 1 ? '' : 's'} due today ${today.due.length === 1 ? 'is' : 'are'} still open.`);
+  if (today.overdue.length) lines.push(`${today.overdue.length} older overdue task${today.overdue.length === 1 ? '' : 's'} still need a decision.`);
+  const progress = today.projects.filter((p: any) => p.tasks_total > 0).slice(0, 3);
+  if (progress.length) lines.push(`Projects: ${progress.map((p: any) => `${p.name} ${p.tasks_done}/${p.tasks_total}`).join(', ')}.`);
+  const next = [...today.overdue, ...today.due, ...tomorrow.due]
+    .sort((a, b) => (a.priority ?? 9) - (b.priority ?? 9))
+    .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
+    .slice(0, 3);
+  lines.push(next.length ? `Suggested priorities for tomorrow: ${next.map((t) => t.title).join('; ')}.` : 'Nothing is due tomorrow.');
+  return lines.join(' ');
+}
+
 /** Suggestions derived from real data patterns — each one names the data it is based on. */
 export function suggestions(o: Overview, db: Db, userId: string, now = new Date()) {
   const out: { text: string; basis: string; action?: string }[] = [];

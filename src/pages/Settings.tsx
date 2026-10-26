@@ -347,7 +347,7 @@ function Notifications() {
       </Card>
       <Card title="Routines" desc="Scheduled summaries built from your real data. Routines only notify you — they never take actions on their own.">
         {routines.data?.routines.map((r: any) => (
-          <Row key={r.id} label={r.kind === 'morning_briefing' ? 'Morning briefing' : 'Evening review'} desc={r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed today and what’s due tomorrow.'}>
+          <Row key={r.id} label={r.kind === 'morning_briefing' ? 'Morning briefing' : 'Evening review'} desc={<>{r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed, what’s still open, project progress and tomorrow’s priorities.'}{r.last_run_at && <> · Last run {fmtDateTime(r.last_run_at)}: {r.last_status === 'failed' ? <span className="badge danger">failed</span> : 'ok'}</>}</>}>
             <input type="time" className="input" style={{ width: 120 }} defaultValue={r.time_local} onBlur={async (e) => { if (e.target.value && e.target.value !== r.time_local) { await patch(`/routines/${r.id}`, { time_local: e.target.value }); toast('Time saved'); routines.reload(); } }} aria-label="Routine time" />
             <Switch label={`Enable ${r.kind}`} checked={r.enabled} onChange={async (v) => { await patch(`/routines/${r.id}`, { enabled: v }); routines.reload(); }} />
           </Row>

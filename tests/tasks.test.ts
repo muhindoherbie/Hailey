@@ -200,4 +200,43 @@ describe('reminder scheduler', () => {
     expect(n.body).toContain('Inventory audit');
     expect(n.body).not.toMatch(/meeting|calendar event/i);
   });
+
+  it('writes an evening review with completed, unfinished and tomorrow’s priorities', async () => {
+    const c = await signup(ctx);
+    const evening = (await c.get('/api/routines')).data.routines.find((r: any) => r.kind === 'evening_review');
+    await c.patch(`/api/routines/${evening.id}`, { enabled: true, time_local: '20:00' });
+    const done = (await c.post('/api/tasks', { title: 'Order stock', due_at: '2026-10-16T12:00:00Z' })).data;
+    await c.post('/api/tasks', { title: 'Mark exams', due_at: '2026-10-16T13:00:00Z' });
+    await c.post('/api/tasks', { title: 'Release v2', due_at: '2026-10-17T09:00:00Z', priority: 1 });
+    ctx.clock.now = new Date('2026-10-16T14:00:00Z');
+    await c.post(`/api/tasks/${done.id}/complete`);
+    ctx.clock.now = new Date('2026-10-16T17:10:00Z'); // 20:10 local
+    expect(await runRoutines(ctx.services)).toBe(1);
+    const n = (await c.get('/api/notifications')).data.notifications.find((x: any) => x.kind === 'routine');
+    expect(n.title).toBe('Evening review');
+    expect(n.body).toContain('completed 1 task today: Order stock');
+    expect(n.body).toContain('1 task due today is still open');
+    expect(n.body).toMatch(/Suggested priorities for tomorrow: Release v2; Mark exams/);
+    const r = (await c.get('/api/routines')).data.routines.find((x: any) => x.id === evening.id);
+    expect(r.last_status).toBe('ok');
+  });
+
+  it('records a failed routine without blocking others', async () => {
+    const a = await signup(ctx, 'Ann');
+    const b = await signup(ctx, 'Ben');
+    for (const c of [a, b]) {
+      const m = (await c.get('/api/routines')).data.routines.find((r: any) => r.kind === 'morning_briefing');
+      await c.patch(`/api/routines/${m.id}`, { enabled: true, time_local: '07:00' });
+    }
+    const orig = ctx.services.push.configured;
+    let calls = 0;
+    ctx.services.push.configured = () => { if (calls++ === 0) throw new Error('boom'); return orig.call(ctx.services.push); };
+    ctx.clock.now = new Date('2026-10-16T04:30:00Z');
+    expect(await runRoutines(ctx.services)).toBe(1);
+    ctx.services.push.configured = orig;
+    const statuses = [a, b].map(async (c) => (await c.get('/api/routines')).data.routines.find((r: any) => r.kind === 'morning_briefing'));
+    const rows = await Promise.all(statuses);
+    expect(rows.map((r) => r.last_status).sort()).toEqual(['failed', 'ok']);
+    expect(rows.find((r) => r.last_status === 'failed').last_error).toBe('boom');
+  });
 });
