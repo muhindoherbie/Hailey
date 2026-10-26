@@ -42,7 +42,7 @@ export function dataRoutes() {
     return c.json({
       overview: o,
       briefing: briefingText(o, s.profile.displayName || c.var.user.name, hour),
-      suggestions: suggestions(o, db(c), uid(c)),
+      suggestions: suggestions(o, db(c), uid(c), now()),
       recentConversations, recentWork, notifications,
       hour,
     });
@@ -183,7 +183,8 @@ export function dataRoutes() {
   // ---------- Reminders ----------
   r.get('/reminders', (c) => c.json({
     reminders: db(c).all(
-      "SELECT * FROM reminders WHERE user_id = ? AND (status IN ('scheduled','sending') OR remind_at > datetime('now','-7 days')) ORDER BY remind_at", uid(c),
+      "SELECT * FROM reminders WHERE user_id = ? AND (status IN ('scheduled','sending') OR remind_at > ?) ORDER BY remind_at", uid(c),
+      new Date(c.var.services.now().getTime() - 7 * 86400_000).toISOString(),
     ),
   }));
   r.post('/reminders', async (c) => {

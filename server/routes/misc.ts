@@ -107,8 +107,8 @@ export function icsRoute() {
     const owner = db.get('SELECT user_id FROM calendar_tokens WHERE token_hash = ?', sha256(token));
     if (!owner) return c.text('Not found', 404);
     const rows = db.all(
-      "SELECT id, title, description, due_at, all_day, status, updated_at FROM tasks WHERE user_id = ? AND due_at IS NOT NULL AND due_at > datetime('now','-60 days') LIMIT 2000",
-      owner.user_id,
+      "SELECT id, title, description, due_at, all_day, status, updated_at FROM tasks WHERE user_id = ? AND due_at IS NOT NULL AND due_at > ? LIMIT 2000",
+      owner.user_id, new Date(c.var.services.now().getTime() - 60 * 86400_000).toISOString(),
     );
     const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
     const dt = (iso: string) => iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');

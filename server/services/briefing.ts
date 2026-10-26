@@ -105,7 +105,7 @@ export function briefingText(o: Overview, name: string, hourLocal: number): stri
 }
 
 /** Suggestions derived from real data patterns — each one names the data it is based on. */
-export function suggestions(o: Overview, db: Db, userId: string) {
+export function suggestions(o: Overview, db: Db, userId: string, now = new Date()) {
   const out: { text: string; basis: string; action?: string }[] = [];
   if (o.overdue.length) out.push({ text: `Carry ${o.overdue.length} overdue task(s) forward or close them`, basis: 'Overdue tasks', action: 'carry_forward' });
   const noEstimate = o.workload.tasksWithoutEstimate;
@@ -115,7 +115,8 @@ export function suggestions(o: Overview, db: Db, userId: string) {
     if (out.length > 5) break;
   }
   const stale = db.all(
-    "SELECT name FROM projects WHERE user_id = ? AND status = 'active' AND updated_at < datetime('now','-14 days') LIMIT 2", userId,
+    "SELECT name FROM projects WHERE user_id = ? AND status = 'active' AND updated_at < ? LIMIT 2", userId,
+    new Date(now.getTime() - 14 * 86400_000).toISOString(),
   );
   for (const p of stale) out.push({ text: `Review “${p.name}” — no activity for two weeks`, basis: 'Project last updated over 14 days ago' });
   if (o.proposedMemories) out.push({ text: 'Review suggested memories', basis: `${o.proposedMemories} awaiting approval`, action: 'memories' });
