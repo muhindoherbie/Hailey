@@ -17,6 +17,7 @@ const Memory = lazy(() => import('./pages/Memory'));
 const Actions = lazy(() => import('./pages/Actions'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Routines = lazy(() => import('./pages/Routines'));
 
 function Router() {
   const { pathname } = useLocation();
@@ -40,6 +41,7 @@ function Router() {
     ['/actions', () => <Actions />],
     ['/notifications', () => <Notifications />],
     ['/settings', () => <Settings />],
+    ['/routines', () => <Routines />],
   ];
   for (const [pattern, render] of routes) {
     const params = match(pattern, pathname);

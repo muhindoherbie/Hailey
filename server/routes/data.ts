@@ -6,6 +6,7 @@ import { parseJson } from '../db/index.ts';
 import * as tasks from '../services/tasks.ts';
 import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
+import * as routines from '../services/routines.ts';
 import { getSettings, updateSettings } from '../services/settings.ts';
 import { buildOverview, briefingText, suggestions } from '../services/briefing.ts';
 import { searchIndex } from '../services/indexer.ts';
@@ -330,18 +331,21 @@ export function dataRoutes() {
   });
 
   // ---------- Routines ----------
-  r.get('/routines', (c) => c.json({ routines: db(c).all('SELECT * FROM routines WHERE user_id = ? ORDER BY time_local', uid(c)).map((x) => ({ ...x, enabled: !!x.enabled, days: parseJson(x.days, []), approved_actions: parseJson(x.approved_actions, []) })) }));
-  r.patch('/routines/:id', async (c) => {
-    const i = z.object({
-      enabled: z.boolean().optional(),
-      time_local: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-      days: z.array(z.number().int().min(0).max(6)).max(7).optional(),
-    }).parse(await body(c));
-    const row = db(c).updateOwned('routines', uid(c), c.req.param('id'), {
-      enabled: i.enabled === undefined ? undefined : i.enabled ? 1 : 0, time_local: i.time_local, days: i.days ? JSON.stringify(i.days) : undefined,
-    }, false);
+  r.get('/routines', (c) => c.json({ routines: routines.listRoutines(db(c), uid(c)) }));
+  r.get('/routines/ideas', (c) => c.json({ ideas: routines.ROUTINE_IDEAS, webSearch: c.var.services.search.available().configured }));
+  r.post('/routines', async (c) => c.json(routines.createRoutine(db(c), uid(c), await body(c)), 201));
+  r.patch('/routines/:id', async (c) => c.json(routines.updateRoutine(db(c), uid(c), c.req.param('id'), await body(c))));
+  r.delete('/routines/:id', (c) => c.json(routines.deleteRoutine(db(c), uid(c), c.req.param('id'))));
+  r.post('/routines/:id/run', async (c) => {
+    const row = db(c).getOwned('routines', uid(c), c.req.param('id'));
     if (!row) throw notFound('Routine');
-    return c.json({ ...row, enabled: !!row.enabled, days: parseJson(row.days, []) });
+    if (row.kind !== 'custom') throw badRequest('Built-in routines run at their scheduled time.');
+    try {
+      return c.json(await routines.runCustomRoutine(c.var.services, row));
+    } catch (err: any) {
+      db(c).run("UPDATE routines SET last_run_at = ?, last_status = 'failed', last_error = ? WHERE id = ?", c.var.services.now().toISOString(), String(err?.message ?? err).slice(0, 300), row.id);
+      throw err;
+    }
   });
 
   // ---------- Usage ----------

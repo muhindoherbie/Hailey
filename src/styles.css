@@ -560,3 +560,11 @@ table.data th { font-weight: 650; color: var(--text-2); background: var(--surfac
 @media (max-width: 600px) { .setting { flex-direction: column; align-items: stretch; } }
 .dropzone { border: 2px dashed var(--border-strong); border-radius: var(--r); padding: 22px; text-align: center; color: var(--text-2); transition: all 0.15s; cursor: pointer; background: var(--surface-2); }
 .dropzone.over { border-color: var(--brand); background: var(--brand-soft); }
+
+/* ---------- Routines ---------- */
+.idea-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 280px); gap: 14px; overflow-x: auto; padding: 4px 2px 14px; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
+.idea-strip > .idea { scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; }
+.idea h3 { font-size: 0.98rem; }
+.day-pick { min-width: 34px; padding-inline: 0; justify-content: center; }
+.routine-result { margin-top: 6px; max-height: 220px; overflow: auto; }
+.warn-text { color: var(--warning); }

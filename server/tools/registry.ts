@@ -10,6 +10,9 @@ import { getSettings, CONSEQUENTIAL_GUARD, type Settings } from '../services/set
 import * as tasks from '../services/tasks.ts';
 import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
+import * as routines from '../services/routines.ts';
+
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 import { searchIndex, type Entity } from '../services/indexer.ts';
 import { documentText, loadSheets, deleteDocument } from '../services/documents.ts';
 import { analyzeSheet } from '../services/spreadsheet.ts';
@@ -339,6 +342,35 @@ export const TOOLS: ToolDef[] = [
         moved.push(t.title);
       }
       return { moved };
+    },
+  }),
+  def({
+    name: 'list_routines',
+    description: 'List the user\'s routines: built-in briefings and their own scheduled routines (what each does, when it runs, whether it is on, and how its last run went).',
+    risk: 'read',
+    input: z.object({}),
+    summarize: () => 'List your routines',
+    run: (_i, ctx) => ({
+      routines: routines.listRoutines(ctx.services.db, ctx.userId).map((r) => ({
+        id: r.id, title: r.title, custom: r.custom, enabled: r.enabled, time: r.time_local, days: r.days,
+        prompt: r.prompt ?? undefined, last_run: r.last_run_at ?? undefined, last_status: r.last_status ?? undefined,
+      })),
+    }),
+  }),
+  def({
+    name: 'create_routine',
+    description: 'Create a scheduled routine: an instruction Hailey carries out on its own at a set local time on chosen weekdays (e.g. "every Friday 16:30 log my wins", "daily 9:00 check this price"). Results arrive as a notification and in the routine\'s own chat. Write the prompt as a complete instruction; confirm the time and days with the user first if they did not give them.',
+    risk: 'reversible',
+    input: z.object({
+      title: z.string().min(1).max(80),
+      prompt: z.string().min(5).max(2000).describe('What Hailey should do each time, written as an instruction'),
+      time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).describe('24-hour local time, HH:MM'),
+      days: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional().describe('Weekdays it runs: 0 = Sunday … 6 = Saturday. Omit for every day.'),
+    }),
+    summarize: (i) => `Create routine "${i.title}" at ${i.time}${i.days ? ` on ${i.days.map((d) => WEEKDAY_NAMES[d]).join(', ')}` : ' every day'}`,
+    run: (i, ctx) => {
+      const r = routines.createRoutine(ctx.services.db, ctx.userId, { title: i.title, prompt: i.prompt, time_local: i.time, days: i.days });
+      return { routine: { id: r.id, title: r.title, time: r.time_local, days: r.days }, manage_at: '/routines' };
     },
   }),
   def({

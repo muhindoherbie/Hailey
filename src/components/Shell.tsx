@@ -15,6 +15,7 @@ const NAV = [
   { to: '/knowledge', label: 'Knowledge', icon: 'book', key: '5' },
   { to: '/research', label: 'Research', icon: 'globe', key: '6' },
   { to: '/memory', label: 'Memory', icon: 'brain', key: '7' },
+  { to: '/routines', label: 'Routines', icon: 'clock', key: '8' },
 ];
 
 const isActive = (to: string, path: string) => (to === '/' ? path === '/' : path === to || path.startsWith(to + '/'));
@@ -39,7 +40,7 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPalette(true);
-      } else if (e.altKey && /^[1-7]$/.test(e.key)) {
+      } else if (e.altKey && /^[1-8]$/.test(e.key)) {
         e.preventDefault();
         navigate(NAV[Number(e.key) - 1].to);
       } else if (!typing && e.key === '/' && !e.ctrlKey && !e.metaKey) {

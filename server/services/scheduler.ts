@@ -5,6 +5,7 @@ import { localClock, localDate, safeTimeZone } from './time.ts';
 import { buildOverview, briefingText, eveningReviewText } from './briefing.ts';
 import { expireMemories } from './memory.ts';
 import { parseJson } from '../db/index.ts';
+import { runCustomRoutine } from './routines.ts';
 
 const MAX_ATTEMPTS = 5;
 
@@ -83,6 +84,18 @@ export async function runRoutines(services: Services) {
     }
     const claim = db.run('UPDATE routines SET last_run_on = ? WHERE id = ? AND (last_run_on IS NULL OR last_run_on != ?)', today, r.id, today);
     if (Number(claim.changes) === 0) continue;
+    if (r.kind === 'custom') {
+      try {
+        await runCustomRoutine(services, r);
+        ran++;
+      } catch (err: any) {
+        console.error('[routine]', r.title, err?.message ?? err);
+        const msg = String(err?.message ?? err).slice(0, 300);
+        db.run("UPDATE routines SET last_run_at = ?, last_status = 'failed', last_error = ? WHERE id = ?", now.toISOString(), msg, r.id);
+        notify(db, r.user_id, { kind: 'action_failed', title: `Routine "${r.title}" failed`, body: msg, link: '/routines' });
+      }
+      continue;
+    }
     try {
       const user = db.get('SELECT name FROM users WHERE id = ?', r.user_id);
       const o = buildOverview(db, r.user_id, now, tz, 0, settings.regional.locale);
@@ -113,14 +126,20 @@ export async function runRoutines(services: Services) {
 
 export function startScheduler(services: Services, intervalMs = 30_000) {
   let running = false;
+  let routinesRunning = false;
   const tick = async () => {
+    // Custom routines call the AI and can take a while, so they run beside the reminder loop
+    // instead of holding it up.
+    if (!routinesRunning) {
+      routinesRunning = true;
+      void runRoutines(services).catch((err) => console.error('[routines]', err)).finally(() => (routinesRunning = false));
+    }
     if (running) return;
     running = true;
     try {
       // Recover reminders stuck in 'sending' after a crash.
       services.db.run("UPDATE reminders SET status = 'scheduled' WHERE status = 'sending' AND remind_at < ?", new Date(services.now().getTime() - 5 * 60_000).toISOString());
       await deliverDueReminders(services);
-      await runRoutines(services);
       expireMemories(services.db, services.now());
       services.db.run('DELETE FROM sessions WHERE expires_at < ?', services.now().toISOString());
       services.db.run('DELETE FROM client_ops WHERE created_at < ?', new Date(services.now().getTime() - 30 * 86400_000).toISOString());

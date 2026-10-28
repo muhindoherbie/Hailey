@@ -7,6 +7,7 @@ import { api, del, patch, post } from '../lib/api';
 import { useSession } from '../lib/session';
 import { fmtDateTime } from '../lib/format';
 import { speak } from '../lib/voice';
+import { Link } from '../lib/router';
 
 const SECTIONS = [
   ['profile', 'Profile & assistant', 'user'],
@@ -348,13 +349,14 @@ function Notifications() {
           </div>
         )}
       </Card>
-      <Card title="Routines" desc="Scheduled summaries built from your real data. Routines only notify you — they never take actions on their own.">
-        {routines.data?.routines.map((r: any) => (
-          <Row key={r.id} label={r.kind === 'morning_briefing' ? 'Morning briefing' : 'Evening review'} desc={<>{r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed, what’s still open, project progress and tomorrow’s priorities.'}{r.last_run_at && <> · Last run {fmtDateTime(r.last_run_at)}: {r.last_status === 'failed' ? <span className="badge danger">failed</span> : 'ok'}</>}</>}>
+      <Card title="Routines" desc={<>Scheduled briefings built from your real data, plus routines of your own. Manage them all, and browse ideas, on the <Link to="/routines">Routines page</Link>.</>}>
+        {routines.data?.routines.filter((r: any) => !r.custom).map((r: any) => (
+          <Row key={r.id} label={r.title} desc={<>{r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed, what’s still open, project progress and tomorrow’s priorities.'}{r.last_run_at && <> · Last run {fmtDateTime(r.last_run_at)}: {r.last_status === 'failed' ? <span className="badge danger">failed</span> : 'ok'}</>}</>}>
             <input type="time" className="input" style={{ width: 120 }} defaultValue={r.time_local} onBlur={async (e) => { if (e.target.value && e.target.value !== r.time_local) { await patch(`/routines/${r.id}`, { time_local: e.target.value }); toast('Time saved'); routines.reload(); } }} aria-label="Routine time" />
-            <Switch label={`Enable ${r.kind}`} checked={r.enabled} onChange={async (v) => { await patch(`/routines/${r.id}`, { enabled: v }); routines.reload(); }} />
+            <Switch label={`Enable ${r.title}`} checked={r.enabled} onChange={async (v) => { await patch(`/routines/${r.id}`, { enabled: v }); routines.reload(); }} />
           </Row>
         ))}
+        {routines.data?.routines.some((r: any) => r.custom) && <p className="small muted" style={{ marginTop: 8 }}>You also have {routines.data.routines.filter((r: any) => r.custom).length} routine(s) of your own — <Link to="/routines">manage them</Link>.</p>}
       </Card>
     </>
   );
