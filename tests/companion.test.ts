@@ -126,3 +126,36 @@ describe('places, calls and chat extras', () => {
     expect((await c.get('/api/notifications')).data.notifications).toHaveLength(0);
   });
 });
+
+describe('Your stuff and the mascot', () => {
+  it('sums up everything Hailey is holding in one call', async () => {
+    const c = await signup(ctx);
+    await c.post('/api/tasks', { title: 'Overdue', due_at: '2026-10-14T09:00:00Z' });
+    await c.post('/api/tasks', { title: 'Today', due_at: '2026-10-16T15:00:00Z' });
+    await c.post('/api/tasks', { title: 'Someday' });
+    await c.post('/api/notes', { title: 'Idea' });
+    await c.post('/api/reminders', { title: 'Call', remind_at: '2026-10-17T09:00:00Z' }).catch(() => undefined);
+    const s = (await c.get('/api/stuff')).data;
+    expect(s.tasks).toEqual({ open: 3, dueToday: 1, overdue: 1 });
+    expect(s.notes).toBe(1);
+    expect(s.routines.active).toBe(0);
+    expect(s).toHaveProperty('approvals', 0);
+    const other = await signup(ctx, 'Other');
+    expect((await other.get('/api/stuff')).data.tasks.open).toBe(0);
+  });
+
+  it('earns the crown with a 4-week streak and refuses accessories not yet earned', async () => {
+    const c = await signup(ctx);
+    expect((await c.patch('/api/settings', { profile: { mascotAccessory: 'party' } })).status).toBe(200);
+    expect((await c.patch('/api/settings', { profile: { mascotAccessory: 'crown' } })).status).toBe(400);
+    expect((await c.patch('/api/settings', { profile: { mascotAccessory: 'chef' } })).status).toBe(400);
+    for (const day of ['2026-09-25', '2026-10-02', '2026-10-09', '2026-10-16']) {
+      ctx.clock.now = new Date(`${day}T08:00:00Z`);
+      await c.get('/api/dashboard');
+    }
+    expect((await c.get('/api/achievements')).data.legendary).toBe(true);
+    expect((await c.patch('/api/settings', { profile: { mascotAccessory: 'crown' } })).data.profile.mascotAccessory).toBe('crown');
+    // Four different weeks also unlock Chef mode, so its hat is allowed too.
+    expect((await c.patch('/api/settings', { profile: { mascotAccessory: 'chef' } })).status).toBe(200);
+  });
+});

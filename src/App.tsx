@@ -24,6 +24,8 @@ const Connectors = lazy(() => import('./pages/Connectors'));
 const Messaging = lazy(() => import('./pages/Messaging'));
 const Discover = lazy(() => import('./pages/Discover'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Stuff = lazy(() => import('./pages/Stuff'));
+const Me = lazy(() => import('./pages/Me'));
 
 function Router() {
   const { pathname } = useLocation();
@@ -57,6 +59,8 @@ function Router() {
     ['/connectors', () => <Connectors />],
     ['/messaging', () => <Messaging />],
     ['/discover', () => <Discover />],
+    ['/stuff', () => <Stuff />],
+    ['/me', () => <Me />],
   ];
   for (const [pattern, render] of routes) {
     const params = match(pattern, pathname);

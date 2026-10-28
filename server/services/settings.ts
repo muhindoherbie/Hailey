@@ -17,9 +17,11 @@ export const settingsSchema = z.object({
     replyLanguage: z.string().max(40).default(''),
     /** A specialist mode unlocked through use (see services/achievements.ts). */
     persona: z.enum(['none', 'chef', 'coach', 'tutor']).default('none'),
+    /** Mascot accessory: auto picks the mode's hat or the crown; party is always available. */
+    mascotAccessory: z.enum(['auto', 'none', 'party', 'crown', 'chef', 'cap', 'headband']).default('auto'),
     /** What the user said they want help with during onboarding (Discover ordering). */
     interests: z.array(z.string().max(40)).max(20).default([]),
-  }).default({ displayName: '', assistantStyle: 'balanced', customInstructions: '', assistantName: 'Hailey', writingStyle: '', replyLanguage: '', persona: 'none', interests: [] }),
+  }).default({ displayName: '', assistantStyle: 'balanced', customInstructions: '', assistantName: 'Hailey', writingStyle: '', replyLanguage: '', persona: 'none', mascotAccessory: 'auto', interests: [] }),
   ai: z.object({
     provider: z.string().max(40).optional(),
     model: z.string().max(80).optional(),

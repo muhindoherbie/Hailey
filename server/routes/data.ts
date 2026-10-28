@@ -46,7 +46,41 @@ export function dataRoutes() {
     if (persona && persona !== 'none' && !achievements.personaUnlocked(db(c), uid(c), persona, c.var.services.now(), tzOf(c))) {
       throw badRequest('That mode is not unlocked yet.');
     }
+    const acc = patchBody?.profile?.mascotAccessory;
+    const needs: Record<string, string> = { chef: 'chef', cap: 'tutor', headband: 'coach' };
+    if (acc && (acc === 'crown' ? !achievements.achievements(db(c), uid(c), c.var.services.now(), tzOf(c)).legendary
+      : needs[acc] && !achievements.personaUnlocked(db(c), uid(c), needs[acc], c.var.services.now(), tzOf(c)))) {
+      throw badRequest('Hailey hasn’t earned that one yet.');
+    }
     return c.json(updateSettings(db(c), uid(c), patchBody));
+  });
+  /** Counts for the "Your stuff" hub: everything Hailey is holding for you, in one place. */
+  r.get('/stuff', (c) => {
+    const u = uid(c);
+    const { now } = c.var.services;
+    const tz = tzOf(c);
+    const today = localDate(now(), tz);
+    const dayEnd = startOfLocalDay(addDays(today, 1), tz).toISOString();
+    const nowIso = now().toISOString();
+    const week = new Date(now().getTime() + 7 * 86400_000).toISOString();
+    const n = (sql: string, ...p: any[]) => Number(db(c).get(sql, u, ...p)!.n);
+    const nextReminder = db(c).get("SELECT title, remind_at FROM reminders WHERE user_id = ? AND status = 'scheduled' AND remind_at >= ? ORDER BY remind_at LIMIT 1", u, nowIso);
+    return c.json({
+      tasks: {
+        open: n("SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status != 'done' AND parent_id IS NULL"),
+        dueToday: n("SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status != 'done' AND due_at IS NOT NULL AND due_at < ? AND due_at >= ?", dayEnd, startOfLocalDay(today, tz).toISOString()),
+        overdue: n("SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status != 'done' AND due_at IS NOT NULL AND due_at < ?", startOfLocalDay(today, tz).toISOString()),
+      },
+      reminders: { upcoming: n("SELECT COUNT(*) AS n FROM reminders WHERE user_id = ? AND status = 'scheduled' AND remind_at >= ? AND remind_at < ?", nowIso, week), next: nextReminder ?? null },
+      routines: { active: n("SELECT COUNT(*) AS n FROM routines WHERE user_id = ? AND enabled = 1"), custom: n("SELECT COUNT(*) AS n FROM routines WHERE user_id = ? AND kind = 'custom'") },
+      notes: n('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?'),
+      documents: n('SELECT COUNT(*) AS n FROM documents WHERE user_id = ?'),
+      projects: n("SELECT COUNT(*) AS n FROM projects WHERE user_id = ? AND status = 'active'"),
+      memories: { active: n("SELECT COUNT(*) AS n FROM memories WHERE user_id = ? AND status = 'active'"), waiting: n("SELECT COUNT(*) AS n FROM memories WHERE user_id = ? AND status = 'proposed'") },
+      apps: n('SELECT COUNT(*) AS n FROM connectors WHERE user_id = ? AND enabled = 1'),
+      chats: n('SELECT COUNT(*) AS n FROM channel_chats WHERE user_id = ?'),
+      approvals: n("SELECT COUNT(*) AS n FROM actions WHERE user_id = ? AND status = 'pending'"),
+    });
   });
   r.get('/discover', (c) => {
     const interests = new Set(getSettings(db(c), uid(c)).profile.interests);

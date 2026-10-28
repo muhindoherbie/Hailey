@@ -6,6 +6,7 @@ import { ErrorBox, Loading } from '../components/ui';
 import { useData } from '../lib/hooks';
 import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
+import { useMascot } from '../lib/mascot';
 
 /** What each card does when tapped. */
 export function openCard(card: any) {
@@ -23,6 +24,7 @@ export default function Discover() {
   const { data, error, loading, reload } = useData<any>('/discover');
   const [cat, setCat] = useState('For you');
   const name = me!.settings.profile.assistantName || 'Hailey';
+  const { accessory } = useMascot();
   const cards: any[] = data?.cards ?? [];
   const hasForYou = cards.some((c) => c.forYou);
   const cats = useMemo(() => [...(hasForYou ? ['For you'] : []), 'All', ...new Set(cards.map((c) => c.category))], [cards, hasForYou]);
@@ -33,7 +35,7 @@ export default function Discover() {
     <Shell title="Discover">
       <div className="page">
         <div className="discover-hero">
-          <Avatar size={84} />
+          <Avatar size={84} accessory={accessory} />
           <div>
             <h1>What can {name} take off your plate?</h1>
             <p className="sub">Swipe through ideas and tap one to start. {name} asks for anything it needs, and nothing is sent, bought or deleted without your OK.</p>

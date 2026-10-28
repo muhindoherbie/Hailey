@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { speakAsync, stopSpeaking, useDictation } from '../lib/voice';
 import { useSession } from '../lib/session';
+import { useMascot } from '../lib/mascot';
 
 /**
  * Hands-free conversation: listen → send when you pause → read the reply aloud → listen again.
@@ -12,6 +13,7 @@ export function VoiceMode({ send, onClose }: { send: (text: string) => Promise<s
   const { me } = useSession();
   const v = me!.settings.voice;
   const name = me!.settings.profile.assistantName || 'Hailey';
+  const { accessory } = useMascot();
   const [phase, setPhase] = useState<'listening' | 'thinking' | 'speaking' | 'paused'>('listening');
   const [heard, setHeard] = useState('');
   const [said, setSaid] = useState('');
@@ -63,7 +65,7 @@ export function VoiceMode({ send, onClose }: { send: (text: string) => Promise<s
   return (
     <div className="voice-mode" role="dialog" aria-modal="true" aria-label="Voice conversation">
       <button className="btn ghost icon voice-close" onClick={onClose} aria-label="End voice conversation"><Icon name="x" /></button>
-      <Avatar state={phase === 'paused' ? 'idle' : phase} size={170} />
+      <Avatar state={phase === 'paused' ? 'idle' : phase} size={170} accessory={accessory} />
       <div className="voice-status" aria-live="polite">{label}</div>
       <p className="voice-text">{phase === 'speaking' ? said.replace(/[#*_`>]/g, '').slice(0, 400) : heard || voice.interim || (phase === 'paused' ? 'Tap the mic and say something.' : 'Say something — pause when you’re done.')}</p>
       {!voice.supported && <p className="small" style={{ color: 'var(--danger)' }}>This browser can’t listen. Voice mode works in Chrome and Edge (on Android and Windows). You can still type in the chat.</p>}

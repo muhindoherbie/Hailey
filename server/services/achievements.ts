@@ -64,6 +64,8 @@ export function achievements(db: Db, userId: string, now: Date, timeZone: string
   const progress: Record<Persona['id'], number> = { chef: weeksVisited, coach: tasksDone, tutor: notes };
   return {
     streak, weeksVisited, tasksDone, notes,
+    /** A 4-week streak earns the crown. */
+    legendary: streak >= 4,
     personas: PERSONAS.map((p) => ({ id: p.id, name: p.name, blurb: p.blurb, requirement: p.requirement, goal: p.goal, progress: Math.min(progress[p.id], p.goal), unlocked: progress[p.id] >= p.goal })),
   };
 }
