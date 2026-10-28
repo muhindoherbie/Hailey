@@ -11,6 +11,8 @@ import { useSession } from '../lib/session';
 import { speak, stopSpeaking, useDictation } from '../lib/voice';
 import { IMAGE_ACCEPT } from '../lib/images';
 import { VoiceMode } from '../components/VoiceMode';
+import { Avatar } from '../components/Avatar';
+import { useMascot } from '../lib/mascot';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; meta: any; created_at: string; pending?: boolean };
 type ToolEv = { id: string; name: string; status: string; summary?: string; error?: string; actionId?: string; result?: any };
@@ -92,6 +94,7 @@ function NewConversation({ initial, projectId, wide, voice }: { initial: string;
   const started = useRef(false);
   const { me } = useSession();
   const configured = me!.server.providers.some((p) => p.configured);
+  const mascot = useMascot();
 
   const start = useCallback(async (text: string, attachments: string[] = []) => {
     try {
@@ -124,7 +127,7 @@ function NewConversation({ initial, projectId, wide, voice }: { initial: string;
       <div className="chat-scroll">
         <div className="chat-thread" style={{ paddingTop: wide ? '8vh' : 12 }}>
           <div style={{ textAlign: 'center' }}>
-            <Mark size={48} />
+            <div style={{ display: 'grid', placeItems: 'center', paddingTop: 16 }}><Avatar size={88} accessory={mascot.accessory} /></div>
             <h2 style={{ marginTop: 14, fontSize: '1.4rem' }}>How can I help?</h2>
             <p className="muted" style={{ marginTop: 6 }}>Ask a question, plan your day, manage tasks, analyse a file, or research a topic.</p>
           </div>

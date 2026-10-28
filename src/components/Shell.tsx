@@ -7,19 +7,30 @@ import { api } from '../lib/api';
 import { Modal } from './ui';
 import { resolveOp, setSyncUser, syncQueue, useSyncState } from '../lib/sync';
 
-const NAV = [
-  { to: '/', label: 'Home', icon: 'home', key: '1' },
-  { to: '/chat', label: 'Chat', icon: 'chat', key: '2' },
-  { to: '/tasks', label: 'Tasks', icon: 'tasks', key: '3' },
-  { to: '/projects', label: 'Projects', icon: 'folder', key: '4' },
-  { to: '/knowledge', label: 'Knowledge', icon: 'book', key: '5' },
-  { to: '/research', label: 'Research', icon: 'globe', key: '6' },
-  { to: '/memory', label: 'Memory', icon: 'brain', key: '7' },
-  { to: '/routines', label: 'Routines', icon: 'clock', key: '8' },
-  { to: '/discover', label: 'Discover', icon: 'sparkle', key: '9' },
+/** The four main places, as tabs on phones and the top of the sidebar on PCs. */
+const PRIMARY = [
+  { to: '/', label: 'Home', icon: 'home' },
+  { to: '/chat', label: 'Chats', icon: 'chat' },
+  { to: '/discover', label: 'Discover', icon: 'sparkle' },
+  { to: '/stuff', label: 'Your stuff', icon: 'archive' },
 ];
+/** What "Your stuff" holds. */
+const STUFF = [
+  { to: '/tasks', label: 'Tasks & reminders', icon: 'tasks' },
+  { to: '/routines', label: 'Routines', icon: 'clock' },
+  { to: '/projects', label: 'Projects', icon: 'folder' },
+  { to: '/knowledge', label: 'Notes & documents', icon: 'book' },
+  { to: '/memory', label: 'Memory', icon: 'brain' },
+  { to: '/research', label: 'Research', icon: 'globe' },
+];
+const NAV = [...PRIMARY, ...STUFF];
+const ME_PATHS = ['/me', '/settings', '/notifications', '/actions', '/messaging', '/connectors'];
 
 const isActive = (to: string, path: string) => (to === '/' ? path === '/' : path === to || path.startsWith(to + '/'));
+const tabActive = (to: string, path: string) =>
+  to === '/stuff' ? isActive('/stuff', path) || STUFF.some((s) => isActive(s.to, path))
+  : to === '/me' ? ME_PATHS.some((p) => isActive(p, path))
+  : isActive(to, path);
 
 export function Shell({ title, actions, children, bare }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; bare?: boolean }) {
   const { pathname } = useLocation();
@@ -30,6 +41,14 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
   const update = useSwUpdate();
 
   useEffect(() => setMenu(false), [pathname]);
+  // Android: notice the on-screen keyboard so the tab bar can step aside for the composer.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => document.documentElement.classList.toggle('kb-open', window.innerHeight - vv.height > 150 || (screen.height - vv.height > 260 && /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? '')));
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
   useEffect(() => {
     if (!me?.user.id) return;
     setSyncUser(me.user.id);
@@ -65,13 +84,18 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
           <Icon name="search" /> <span className="grow">Search</span> <span className="kbd desktop-only">Ctrl K</span>
         </button>
         <Link to="/chat/new" className="nav-item" style={{ color: 'var(--brand-text)' }}><Icon name="plus" />New chat</Link>
-        <div className="nav-section">Workspace</div>
-        {NAV.map((n) => (
+        {PRIMARY.map((n) => (
           <Link key={n.to} to={n.to} className={`nav-item ${isActive(n.to, pathname) ? 'active' : ''}`} aria-current={isActive(n.to, pathname) ? 'page' : undefined}>
             <Icon name={n.icon} /> {n.label}
           </Link>
         ))}
-        <div className="nav-section">Control</div>
+        <div className="nav-section">Your stuff</div>
+        {STUFF.map((n) => (
+          <Link key={n.to} to={n.to} className={`nav-item ${isActive(n.to, pathname) ? 'active' : ''}`} aria-current={isActive(n.to, pathname) ? 'page' : undefined}>
+            <Icon name={n.icon} /> {n.label}
+          </Link>
+        ))}
+        <div className="nav-section">You</div>
         <Link to="/actions" className={`nav-item ${isActive('/actions', pathname) ? 'active' : ''}`}>
           <Icon name="shield" /> Approvals
           {counts.pendingActions > 0 && <span className="count" aria-label={`${counts.pendingActions} waiting`}>{counts.pendingActions}</span>}
@@ -113,14 +137,16 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
         {children}
       </div>
 
-      <nav className="bottom-nav" aria-label="Quick navigation">
-        {[NAV[0], NAV[1], NAV[2], NAV[4]].map((n) => (
-          <Link key={n.to} to={n.to} className={isActive(n.to, pathname) ? 'active' : ''}><Icon name={n.icon} size={21} />{n.label}</Link>
-        ))}
-        <a href="#menu" onClick={(e) => { e.preventDefault(); setMenu(true); }}>
-          <Icon name="menu" size={21} />More
-          {counts.pendingActions + counts.unread > 0 && <span className="dot" />}
-        </a>
+      <nav className="bottom-nav" aria-label="Main sections">
+        {[...PRIMARY, { to: '/me', label: 'Me', icon: 'user' }].map((n) => {
+          const on = tabActive(n.to, pathname);
+          return (
+            <Link key={n.to} to={n.to} className={on ? 'active' : ''} aria-current={on ? 'page' : undefined}>
+              <span className="tab-ic"><Icon name={n.icon} size={21} /></span>{n.label}
+              {n.to === '/me' && counts.pendingActions + counts.unread > 0 && <span className="dot" aria-label="Something needs you" />}
+            </Link>
+          );
+        })}
       </nav>
 
       {palette && <CommandPalette onClose={() => setPalette(false)} />}

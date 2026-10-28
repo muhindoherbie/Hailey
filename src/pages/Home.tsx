@@ -3,6 +3,7 @@ import { Shell } from '../components/Shell';
 import { Icon } from '../components/Icon';
 import { TaskItem } from '../components/TaskItem';
 import { Avatar } from '../components/Avatar';
+import { useMascot } from '../lib/mascot';
 import { Empty, ErrorBox, Loading, Modal, StaleNote, Switch, useToast } from '../components/ui';
 import { useData } from '../lib/hooks';
 import { useSession } from '../lib/session';
@@ -25,6 +26,7 @@ export function Home() {
   const saved: { id: string; visible: boolean }[] = me!.settings.dashboard.widgets;
   const widgets = [...saved, ...Object.keys(WIDGET_NAMES).filter((id) => !saved.some((w) => w.id === id)).map((id) => ({ id, visible: true }))];
   const discover = useData<any>('/discover');
+  const mascot = useMascot();
   const name = me!.settings.profile.displayName || me!.user.name;
 
   const hour = data?.hour ?? new Date().getHours();
@@ -169,22 +171,43 @@ export function Home() {
     ),
   };
 
-  const visible = widgets.filter((w) => w.visible && render[w.id]);
-  const full = new Set(['briefing', 'quick']);
+  // The briefing, week and ideas now live in the highlight cards at the top.
+  const IN_CARDS = new Set(['briefing', 'week', 'discover']);
+  const visible = widgets.filter((w) => w.visible && render[w.id] && !IN_CARDS.has(w.id));
+  const full = new Set(['quick']);
 
   return (
     <Shell title="Home" actions={<button className="btn ghost sm" onClick={() => setCustomize(true)}><Icon name="settings" size={16} /><span className="desktop-only">Customise</span></button>}>
       <div className="page">
-        <div className="hero">
-          <div className="row" style={{ gap: 14 }}>
-            <Link to="/chat/new?voice=1" aria-label={`Talk to ${me!.settings.profile.assistantName || 'Hailey'}`} title="Talk hands-free"><Avatar size={52} /></Link>
-            <div className="greet">{greet}, {name.split(' ')[0]}</div>
-          </div>
+        <div className="home-hero">
+          <Link to="/chat/new?voice=1" className="home-mascot" aria-label={`Talk to ${mascot.name}`} title="Tap to talk hands-free"><Avatar size={104} accessory={mascot.accessory} /></Link>
+          <div className="greet">{greet}, {name.split(' ')[0]}</div>
           <div className="date">{now}</div>
           <AskBar />
+          <div className="starter-chips" role="list" aria-label="Quick starts">
+            {[
+              ['tasks', 'Plan my day', '/chat/new?q=' + encodeURIComponent('Help me plan my day using my tasks, deadlines and projects.')],
+              ['mic', 'Ramble it out', '/ramble'],
+              ['bell', 'Remind me…', '/chat/new?q=' + encodeURIComponent('Remind me ')],
+              ['speaker', 'Just talk', '/chat/new?voice=1'],
+              ['sparkle', 'Ideas', '/discover'],
+            ].map(([icon, label, to]) => <Link key={label} to={to} className="chip" role="listitem"><Icon name={icon} size={15} />{label}</Link>)}
+          </div>
         </div>
         <StaleNote savedAt={stale} />
         <ErrorBox error={error} retry={reload} />
+        {data && <HighlightCards data={data} idea={discover.data?.cards?.[0]} streakName={mascot.name} />}
+        {data?.recentConversations?.length > 0 && (
+          <section className="home-section">
+            <div className="row"><h2 className="grow">Recent chats</h2><Link to="/chat" className="small">All chats</Link></div>
+            <div className="recent-chats">
+              {data.recentConversations.slice(0, 6).map((c: any) => (
+                <Link key={c.id} to={`/chat/${c.id}`} className="card recent-chat"><Icon name="chat" size={16} /><span className="grow ellipsis">{c.title}</span><span className="tiny faint">{relative(c.updated_at)}</span></Link>
+              ))}
+            </div>
+          </section>
+        )}
+        <h2 className="home-section-title">Your day</h2>
         {loading && !data ? <Loading rows={4} /> : (
           <div className="grid two">
             {visible.map((w) => {
@@ -199,9 +222,52 @@ export function Home() {
         )}
       </div>
       {customize && (
-        <CustomizeDashboard widgets={widgets} onClose={() => setCustomize(false)} onSave={(w) => saveSettings({ dashboard: { widgets: w } })} />
+        <CustomizeDashboard widgets={widgets.filter((w) => !IN_CARDS.has(w.id))} onClose={() => setCustomize(false)} onSave={(w) => saveSettings({ dashboard: { widgets: w } })} />
       )}
     </Shell>
+  );
+}
+
+/** Swipeable cards at the top of Home: the day at a glance, each one tappable. */
+function HighlightCards({ data, idea, streakName }: { data: any; idea?: any; streakName: string }) {
+  const o = data.overview;
+  const due = o.overdue.length + o.due.length;
+  const next = o.reminders[0] ?? null;
+  const nextTask = o.upcoming[0] ?? null;
+  const cards: { key: string; tone: string; icon: string; kicker: string; title: string; body: string; to: string }[] = [
+    {
+      key: 'today', tone: o.overdue.length ? 'warn' : 'brand', icon: 'tasks', kicker: 'Today',
+      title: due ? `${due} thing${due > 1 ? 's' : ''} to do` : 'Nothing due today',
+      body: o.overdue.length ? `${o.overdue.length} overdue — tap to sort them out` : due ? [...o.overdue, ...o.due].slice(0, 2).map((t: any) => t.title).join(' · ') : 'Enjoy it, or plan something new.',
+      to: '/tasks',
+    },
+    { key: 'brief', tone: 'sun', icon: 'sun', kicker: 'Your briefing', title: 'Here’s your day', body: data.briefing, to: '/chat/new?q=' + encodeURIComponent('Help me plan my day using my tasks, deadlines and projects.') },
+    {
+      key: 'next', tone: 'sky', icon: next ? 'bell' : 'calendar', kicker: 'Coming up',
+      title: next ? next.title : nextTask ? nextTask.title : 'A clear week ahead',
+      body: next ? `Reminder · ${next.at}` : nextTask ? `Due ${fmtDateTime(nextTask.due_at, { weekday: true })}` : 'No deadlines or reminders in the next 7 days.',
+      to: '/tasks?view=upcoming',
+    },
+  ];
+  if (data.week) {
+    cards.push({
+      key: 'week', tone: 'leaf', icon: 'chart', kicker: 'Your week',
+      title: `${data.week.tasksCompleted} done this week`,
+      body: data.streak > 1 ? `🔥 ${data.streak} weeks in a row with ${streakName}${data.streak >= 4 ? ' — legendary 👑' : ''}` : `${data.week.tasksAdded} added · ${data.week.remindersSent} reminders sent`,
+      to: '/me',
+    });
+  }
+  if (idea) cards.push({ key: 'idea', tone: 'berry', icon: idea.icon, kicker: 'Try this', title: idea.title, body: idea.blurb, to: '/discover' });
+  return (
+    <section className="highlights" aria-label="Your day at a glance">
+      {cards.map((c) => (
+        <Link key={c.key} to={c.to} className={`highlight hl-${c.tone}`}>
+          <span className="hl-kicker"><Icon name={c.icon} size={14} />{c.kicker}</span>
+          <span className="hl-title">{c.title}</span>
+          <span className="hl-body">{c.body}</span>
+        </Link>
+      ))}
+    </section>
   );
 }
 
@@ -260,14 +326,16 @@ function AskBar() {
     <>
       <form className="ask" onSubmit={submit} role="search">
         <Icon name="sparkle" style={{ color: 'var(--brand)' }} />
-        <label htmlFor="ask" className="sr-only">Ask Hailey</label>
-        <input id="ask" data-composer placeholder={voice.listening ? 'Listening…' : `Ask ${me!.settings.profile.assistantName || 'Hailey'} anything, or say what to do…`} value={voice.interim ? `${q} ${voice.interim}` : q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+        <label htmlFor="ask" className="sr-only">Ask {me!.settings.profile.assistantName || 'Hailey'}</label>
+        <input id="ask" data-composer enterKeyHint="send" placeholder={voice.listening ? 'Listening…' : 'What’s on your mind?'} value={voice.interim ? `${q} ${voice.interim}` : q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
         {me!.settings.voice.enabled && voice.supported && (
           <button type="button" className={`btn ghost icon ${voice.listening ? 'recording' : ''}`} onClick={voice.listening ? voice.stop : voice.start} aria-label={voice.listening ? 'Stop recording' : 'Speak'} aria-pressed={voice.listening}>
             <Icon name={voice.listening ? 'stop' : 'mic'} />
           </button>
         )}
-        <button className="btn primary" disabled={!q.trim()} aria-label="Ask"><Icon name="send" /></button>
+        {q.trim() || !voice.supported
+          ? <button className="btn primary icon" disabled={!q.trim()} aria-label="Ask"><Icon name="send" /></button>
+          : <Link to="/chat/new?voice=1" className="btn primary icon" aria-label="Talk hands-free" title="Talk hands-free"><Icon name="speaker" /></Link>}
       </form>
       {voice.listening && <p className="faint tiny" style={{ marginTop: 6 }}>Recording… speech is transcribed by your browser’s speech service.</p>}
       {voice.error && <p className="small" style={{ color: 'var(--danger)', marginTop: 6 }}>{voice.error}</p>}
