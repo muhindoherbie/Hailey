@@ -12,17 +12,21 @@ It is an installable web app (PWA) for Windows and Android browsers, backed by a
 | Area | What works |
 |---|---|
 | **Home** | Greeting, local date/time, AI prompt with voice input, today's and overdue tasks, upcoming deadlines and reminders, active projects, quick actions, recent chats and work, a daily briefing and suggestions built **only from your saved data**. Widgets can be hidden and reordered. |
-| **Chat** | Streaming replies with Markdown, code and tables; persistent history; search, rename, archive, delete; cancel and retry; file attachments; copy, read aloud, save as note; export chats to Markdown, Word or PDF; summarise a chat into memory. Shows which AI model answered each reply and, with automatic model choice on, why. |
-| **Tool-using agent** | 32 typed, validated tools: tasks, reminders, notes, projects and plans, memory, knowledge search, document reading, spreadsheet analysis, web research, workload checks, read-only GitHub summaries, file exports. Every action is logged. **Deletions always wait for your approval**, and each approval is bound to the exact action and expires after 7 days; you can set any tool to *Allowed*, *Ask me first* or *Off*. |
+| **Chat** | Streaming replies with Markdown, code and tables; persistent history; search, rename, archive, delete; cancel and retry; file and photo attachments (photos are shown to models that can see images); copy, read aloud, save as note; export chats to Markdown, Word or PDF; summarise a chat into memory. Shows which AI model answered each reply and, with automatic model choice on, why. |
+| **Tool-using agent** | 34 typed, validated tools: tasks, reminders, notes, projects and plans, routines, memory, knowledge search, document reading, spreadsheet analysis, web research, workload checks, read-only GitHub summaries, file exports — plus the tools of any apps you connect. Every action is logged. **Deletions always wait for your approval**, and each approval is bound to the exact action and expires after 7 days; you can set any tool to *Allowed*, *Ask me first* or *Off*. |
 | **Memory** | Long-term memory kept separate from chat history. Sensitive or inferred memories wait for your approval. View, edit, export, delete, clear by category, retention period, and a per-answer "used these memories" note. |
 | **Tasks** | Priorities, due dates, subtasks, tags, categories, projects, recurrence, estimates, history; Today / Upcoming / Overdue / No date / Completed / Calendar views; natural-language quick add ("remind me tomorrow morning…") that **shows how it read the date and asks you to confirm**; carry overdue tasks forward; task dependencies; warnings for overloaded days and for tasks due before what they depend on. |
 | **Reminders** | Scheduled on the server and delivered by web push even when the app is closed; quiet hours; retries; in-app notification centre. Morning briefing and evening review routines (the review covers what you finished, what is still open, project progress and suggested priorities for tomorrow), each showing its last run result. |
+| **Routines** | Your own scheduled instructions that Hailey carries out on the server at a set time and days — “every Friday at 16:30 log my wins”, “daily at 9 check this price”, “weekday mornings teach me one Luganda word”. Pick from 17 ready-made ideas or write your own, or just ask in chat. Each routine keeps its own chat so it builds on earlier runs; results arrive as a notification; anything that needs approval waits for you. Run now, edit, pause or delete any time. |
+| **Ramble it out** | Talk (continuous voice input, pauses are fine) or type everything on your mind; Hailey sorts it into tasks, reminders and notes and reads each date with the same parser as quick add. You untick, edit and confirm before anything is added. |
+| **Connected apps** | Connect email, calendar, notes, project and thousands of other apps through **MCP**, either directly or via a connector service (Zapier MCP, Composio, Pipedream…). Read-only tools run freely; sending, changing and deleting ask first unless you allow a tool; destructive tools always ask. |
+| **Share to Hailey** | Once installed, Hailey appears in Android's (and desktop Chrome/Edge's) Share menu: share a link, text, photo or document and choose *Ask Hailey*, *Save as note*, *Add as task* or *Save files*. |
 | **Projects & workspaces** | Five starter workspaces (Personal, Pharmacy & business, Education & research, Software, General); projects with goals, milestones, decisions, risks, blockers, tasks, notes, documents, activity and progress; "Continue with Hailey" resumes a project with its context. |
-| **Knowledge centre** | Markdown notes with folders, tags, pinning and links to tasks/projects/documents; uploads of **PDF (text-based), DOCX, TXT, MD, CSV, XLSX**; full-text search with page/section references; AI summaries and key points. |
+| **Knowledge centre** | Markdown notes with folders, tags, pinning and links to tasks/projects/documents; uploads of **PDF (text-based), DOCX, TXT, MD, CSV, XLSX and photos (JPG, PNG, WebP, GIF — shrunk on your device to fit 5 MB)**; full-text search with page/section references; AI summaries and key points. |
 | **Data analysis** | CSV/XLSX profiling: totals, means, medians, missing values, rankings, monthly trends, outliers, charts; downloadable reports (Word, PDF, Excel, Markdown). Calculations are done by code, and the method is explained. |
 | **Research** | Live web search through SearXNG (free, self-hosted) or Brave Search, with numbered citations, a sources list, conflicts and gaps called out, follow-up questions, and "save as research note". It says plainly when search is not configured. |
 | **Exports** | Real files generated from content: DOCX, PDF, XLSX, PPTX, CSV, Markdown. |
-| **Voice** | Push-to-talk speech input and read-aloud replies, with a clear recording indicator; falls back to typing. |
+| **Voice** | Push-to-talk speech input, continuous dictation in Ramble, and read-aloud replies, with a clear recording indicator; falls back to typing. |
 | **Settings** | Profile and assistant style, AI provider/model/effort, connection test, local-only mode, automatic model choice, usage and estimated costs, daily and monthly token limits, memory, permissions, notifications and routines, theme, colour palette (Classic or Midnight) and text size, time zone and date format, voice, calendar feed, data export, signed-in devices, password, account deletion. |
 | **Offline** | The app shell opens offline; notes, tasks, projects and the dashboard you have opened are readable offline. New tasks and edits to tasks, notes and projects made offline are kept on the device and synced when you reconnect, each exactly once; if something changed elsewhere meanwhile, Hailey asks which version to keep. |
 | **GitHub (read-only)** | Ask about a repository's open issues, pull requests, latest release and recent commits. Public repositories need no setup; set `GITHUB_TOKEN` for private ones. Hailey never writes to GitHub. |
@@ -30,7 +34,10 @@ It is an installable web app (PWA) for Windows and Android browsers, backed by a
 ### Honest limitations
 - AI chat, research and reminders need the server and an internet connection. Offline, you can add and edit tasks, notes and projects; deleting things, uploads and anything involving the AI wait for a connection.
 - Scanned PDFs (images) are not supported — there is no OCR. Old `.doc`/`.xls` files are not supported.
-- Hailey cannot send email or messages, or edit Google/Outlook calendars. It offers a **read-only calendar feed** of your tasks instead.
+- Hailey has no email or calendar of its own. To work with Gmail, Outlook, Google Calendar and similar, add them as **connected apps** (see below); apps that need a browser sign-in pop-up (OAuth) have to go through a connector service. Without them, Hailey offers a **read-only calendar feed** of your tasks.
+- Looking at photos needs a model that can see images: Claude can; for an OpenAI-compatible or local model, choose one with vision and set `OPENAI_COMPAT_VISION=true`.
+- Each custom routine run and each Ramble is an AI request and counts towards your usage and limits.
+- Hailey does not make phone calls or message on WhatsApp for you.
 - Push notifications on Windows arrive only while the browser is allowed to run in the background. On Android, install Hailey to the home screen for the most reliable delivery.
 - Voice input uses your browser's speech service (Google in Chrome, Microsoft in Edge), so audio is processed by that company.
 
@@ -110,7 +117,8 @@ Edit `.env` (in Notepad) and fill in **one** of the options below, then restart 
    ```
    - `qwen3:4b` (the "thinking" version) took over a minute per reply and could not turn thinking off — prefer `qwen3:4b-instruct`. For thinking models that support it, `OPENAI_COMPAT_REASONING_EFFORT=none` turns thinking off.
    - Keep the model loaded between messages so its prompt cache survives: `setx OLLAMA_KEEP_ALIVE 30m`, then restart Ollama. The first message after loading took about 2 minutes; later replies started in roughly 4–30 seconds.
-   - `OPENAI_COMPAT_TOOLSET=core` sends 13 everyday tools instead of all 30, roughly halving the prompt.
+   - `OPENAI_COMPAT_TOOLSET=core` sends 13 everyday tools instead of all 34, roughly halving the prompt. Tools from connected apps are sent in both modes.
+   - To let a local model look at photos, pick one with vision (for example `gemma3` or `qwen2.5vl`) and set `OPENAI_COMPAT_VISION=true`.
 
    **What to expect from a 4B model:** fine for conversation, questions and simple reminders, but unreliable at actions — in testing it sometimes skipped saving a memory, guessed ids, or claimed it had scheduled something it hadn't. Hailey checks for this: a reply that claims an action no tool performed gets a visible *"Not actually saved"* warning, and an explicit "remember that…" request that wasn't saved says so. For dependable task, reminder and memory handling, use Claude (Haiku 5.5 costs about US$1–2/month for typical personal use) or a larger local model on a PC with a capable GPU.
 
@@ -126,6 +134,16 @@ Groq, OpenRouter, Google Gemini's OpenAI-compatible endpoint and similar service
 - **Brave Search API:** sign up at <https://brave.com/search/api/> (free tier with a monthly limit) and set `BRAVE_SEARCH_API_KEY`.
 
 Without either, Research tells you it is unavailable — Hailey never pretends to have browsed.
+
+---
+
+## Connected apps (optional)
+Open **Connected apps** in the sidebar, choose **Connect an app**, and paste an MCP server address (and an access token if the app gave you one). Hailey checks it, lists the app's tools, and from then on can use them in chat and in routines.
+
+- **Easiest route to Gmail, Google Calendar, Outlook, Slack, Notion, Todoist and more:** a connector service such as Zapier MCP, Composio or Pipedream. Sign in there, choose the apps and actions to allow, and copy your personal MCP address. Treat that address like a password.
+- **Apps with their own MCP server** (GitHub, Linear, Atlassian, many others) publish an address and explain how to make a token. Use the *Streamable HTTP* address — it often ends in `/mcp`. Older SSE-only servers are not supported.
+- **Permissions:** tools the app marks read-only run freely; every other tool asks first unless you set it to *Allowed* under *Tools & permissions*; tools the app marks destructive always ask.
+- **Your own MCP servers on your home network** are refused by default so a connector address can't be used to reach other machines; set `MCP_ALLOW_PRIVATE_NETWORK=true` only if you run them yourself.
 
 ---
 
@@ -199,7 +217,7 @@ docker compose up -d --build
 ```bash
 npm run backup
 ```
-Creates `backups/hailey-<date>/` containing a consistent copy of the database (safe while Hailey is running), your uploads and exports, verified with an integrity check. The 14 newest backups are kept (`BACKUP_KEEP` to change). Copy the `backups` folder to another drive or cloud storage regularly — a backup on the same disk does not protect against disk failure.
+Creates `backups/hailey-<date>/` containing a consistent copy of the database (safe while Hailey is running), your uploads and exports, verified with an integrity check. Connected-app tokens are encrypted with `data/secret.key`, which is deliberately not included; copy it yourself if you want tokens to survive a restore on another machine, or re-enter them afterwards. The 14 newest backups are kept (`BACKUP_KEEP` to change). Copy the `backups` folder to another drive or cloud storage regularly — a backup on the same disk does not protect against disk failure.
 
 To restore, **stop Hailey first**, then:
 ```bash
@@ -236,7 +254,8 @@ server/
   routes/       auth, data (tasks/notes/projects/memory/settings/actions…), chat (SSE), files, research/push/calendar
   ai/           Provider interface; Claude adapter (official SDK); OpenAI-compatible adapter; agent loop
   tools/        Tool registry: typed schemas (zod), risk levels, permission policy, approval queue
-  services/     tasks, memory, knowledge, documents, spreadsheets, exporters, search, push, scheduler, briefing, time
+  services/     tasks, memory, knowledge, documents, spreadsheets, exporters, search, push, scheduler, briefing,
+                routines, ramble, connectors + mcp (MCP client), secrets, time
   db/           node:sqlite wrapper and SQL migrations (FTS5 full-text search)
 tests/          Vitest suites with a scripted fake AI provider
 scripts/        setup, backup, restore, icon generator, dev runner

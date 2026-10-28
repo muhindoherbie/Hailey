@@ -14,11 +14,15 @@ import { buildOverview, briefingText, suggestions } from '../services/briefing.t
 import { searchIndex } from '../services/indexer.ts';
 import { localDate, startOfLocalDay, addDays, safeTimeZone, localClock, parseWhen, formatLocal } from '../services/time.ts';
 import { approveAction, rejectAction, TOOLS, executeTool, makeContext } from '../tools/registry.ts';
+import { rateLimit } from '../middleware.ts';
 
 const page = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100), offset: z.coerce.number().int().min(0).default(0) });
 
 export function dataRoutes() {
   const r = new Hono<AppEnv>();
+  // Each of these is a full AI request, so they get their own per-user limit.
+  const aiLimit = rateLimit({ name: 'ai-actions', windowMs: 60_000, max: 10, key: (c) => c.var.user.id });
+  const connectLimit = rateLimit({ name: 'connectors', windowMs: 60_000, max: 10, key: (c) => c.var.user.id });
   const uid = (c: any) => c.var.user.id as string;
   const db = (c: any) => c.var.services.db as AppEnv['Variables']['services']['db'];
   const tzOf = (c: any) => safeTimeZone(getSettings(db(c), uid(c)).regional.timeZone);
@@ -338,7 +342,7 @@ export function dataRoutes() {
   r.post('/routines', async (c) => c.json(routines.createRoutine(db(c), uid(c), await body(c)), 201));
   r.patch('/routines/:id', async (c) => c.json(routines.updateRoutine(db(c), uid(c), c.req.param('id'), await body(c))));
   r.delete('/routines/:id', (c) => c.json(routines.deleteRoutine(db(c), uid(c), c.req.param('id'))));
-  r.post('/routines/:id/run', async (c) => {
+  r.post('/routines/:id/run', aiLimit, async (c) => {
     const row = db(c).getOwned('routines', uid(c), c.req.param('id'));
     if (!row) throw notFound('Routine');
     if (row.kind !== 'custom') throw badRequest('Built-in routines run at their scheduled time.');
@@ -352,13 +356,13 @@ export function dataRoutes() {
 
   // ---------- Connected apps (MCP) ----------
   r.get('/connectors', (c) => c.json({ connectors: connectors.listConnectors(db(c), uid(c)), allowPrivate: c.var.services.config.MCP_ALLOW_PRIVATE_NETWORK === 'true' }));
-  r.post('/connectors', async (c) => c.json(await connectors.addConnector(c.var.services, uid(c), await body(c)), 201));
-  r.post('/connectors/:id/refresh', async (c) => c.json(await connectors.refreshConnector(c.var.services, uid(c), c.req.param('id'))));
+  r.post('/connectors', connectLimit, async (c) => c.json(await connectors.addConnector(c.var.services, uid(c), await body(c)), 201));
+  r.post('/connectors/:id/refresh', connectLimit, async (c) => c.json(await connectors.refreshConnector(c.var.services, uid(c), c.req.param('id'))));
   r.patch('/connectors/:id', async (c) => c.json(connectors.updateConnector(c.var.services, uid(c), c.req.param('id'), await body(c))));
   r.delete('/connectors/:id', (c) => c.json(connectors.deleteConnector(db(c), uid(c), c.req.param('id'))));
 
   // ---------- Ramble (brain-dump → tasks, reminders, notes) ----------
-  r.post('/ramble/extract', async (c) => {
+  r.post('/ramble/extract', aiLimit, async (c) => {
     const i = z.object({ text: z.string().max(MAX_RAMBLE_CHARS + 1000) }).parse(await body(c));
     return c.json(await extractRamble(c.var.services, uid(c), i.text));
   });

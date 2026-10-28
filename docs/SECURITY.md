@@ -19,8 +19,9 @@ This describes how Hailey protects your data and where its limits are. No review
 - **Errors:** clients get short, safe messages; stack traces and internals are only logged on the server.
 
 ## Files
-- Only PDF, DOCX, TXT, MD, CSV and XLSX are accepted, and the file's actual bytes must match its extension (e.g. a renamed `.exe` is rejected). File names are sanitised. Files are stored outside the web root, named by random id.
-- Downloads are always sent as attachments with `application/octet-stream`, so uploaded content is never rendered by the browser.
+- Only PDF, DOCX, TXT, MD, CSV, XLSX and JPG/PNG/WebP/GIF images are accepted, and the file's actual bytes must match its type (e.g. a renamed `.exe` is rejected; an image's type is read from its leading bytes). File names are sanitised. Files are stored outside the web root, named by random id.
+- Downloads are always sent as attachments with `application/octet-stream`, so uploaded content is never rendered by the browser. The one exception is the image preview, which serves only files stored as images, with their verified image type and a `default-src 'none'; sandbox` Content-Security-Policy. SVG is not accepted.
+- Items shared to Hailey from other apps' Share menu stay in a cache on the device until you choose what to do with them; nothing is uploaded before that.
 - Spreadsheets are read as values only: **formulas are never evaluated and macros are never run**. Exported CSV/XLSX cells that start with `=`, `+`, `-` or `@` are prefixed to prevent spreadsheet formula injection.
 - Hailey never executes uploaded code or model-generated code or shell commands.
 
@@ -29,7 +30,9 @@ This describes how Hailey protects your data and where its limits are. No review
 - Every tool call is validated against its schema on the server before running. Tools run as the signed-in user and cannot reach other users' data.
 - **Consequential actions (deletions) are always queued** and run only after you approve them in the app, exactly once. You can switch any tool to *Ask me first* or *Off*; settings refuse to make consequential tools automatic. Each queued action is bound to a SHA-256 hash of the user, tool and exact arguments, and expires after 7 days; a changed or expired action is refused.
 - **Local-only mode** (Settings → AI) keeps conversations on a local model. Hailey never silently falls back from a chosen local model to a cloud provider.
-- Routines only produce summaries and notifications; they do not take actions.
+- The built-in briefings only produce summaries and notifications. **Custom routines** run as an ordinary agent turn with your usual tool permissions: anything set to *Ask me first*, and every consequential action, is queued for your approval rather than done. Each run is visible in the routine's own chat.
+- **Connected apps (MCP):** tools from apps you connect are named `mcp_…`. Read-only tools (as the app declares them) run freely; every other connector tool asks first by default, and tools the app marks as destructive can never be set to run automatically. Their descriptions and results are treated as untrusted third-party content.
+- Connector addresses are checked before every connection: addresses on the server's own network (loopback, private, link-local, carrier-grade NAT) are refused unless `MCP_ALLOW_PRIVATE_NETWORK=true`, internet addresses must use HTTPS, and redirects and credentials embedded in the URL are refused. DNS is checked at connection time, so a hostname that changes its answer between the check and the request (DNS rebinding) is not fully excluded; keep the setting off unless you need it.
 - Content from documents, web pages and search results is marked as untrusted, and the model is instructed not to follow instructions found inside it. This reduces, but cannot fully eliminate, prompt-injection risk — which is why consequential actions still require your approval.
 - The action history records what each action did (summary, tool, result status), not the full conversation.
 - Chat Markdown is sanitised with DOMPurify; images, forms, frames and inline styles are stripped, and links open with `noopener noreferrer`.
@@ -37,9 +40,11 @@ This describes how Hailey protects your data and where its limits are. No review
 ## Secrets
 - API keys and VAPID keys live only in the server's `.env` file (git-ignored) and environment. They are never sent to the browser, included in the client bundle, or returned by any API.
 - The calendar feed uses a random token; only its hash is stored, and you can revoke or rotate it.
+- Connector access tokens are encrypted with AES-256-GCM using a key in `secret.key` in the data folder (created on first use, readable only by the server's user). The key is separate from `hailey.db` and is not copied by `npm run backup`, so a database copy or backup alone does not reveal tokens; after a restore on another machine, re-enter them. Tokens are never returned by the API.
 
 ## What leaves your server
-- **AI provider:** the conversation, retrieved memories and the text of attached documents are sent to the AI provider you configure. With a local model (Ollama) nothing leaves your machine.
+- **AI provider:** the conversation, retrieved memories, the text of attached documents and attached images (for models that can see them) are sent to the AI provider you configure. Custom routines and Ramble use the same provider. With a local model (Ollama) nothing leaves your machine.
+- **Connected apps:** when Hailey uses a connected app's tool, the tool's arguments go to that app's MCP server (and whatever service is behind it).
 - **Web search:** your research query goes to SearXNG (and from there to search engines) or to Brave.
 - **Push notifications:** notification text passes through the browser vendor's push service, encrypted end-to-end per the Web Push standard.
 - **Voice input:** processed by your browser's speech service.
