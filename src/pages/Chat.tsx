@@ -9,6 +9,7 @@ import { Link, navigate, useLocation } from '../lib/router';
 import { relative } from '../lib/format';
 import { useSession } from '../lib/session';
 import { speak, stopSpeaking, useDictation } from '../lib/voice';
+import { IMAGE_ACCEPT } from '../lib/images';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; meta: any; created_at: string; pending?: boolean };
 type ToolEv = { id: string; name: string; status: string; summary?: string; error?: string; actionId?: string; result?: any };
@@ -366,7 +367,9 @@ function MessageView({ m }: { m: Msg }) {
       <div className="msg user">
         <div className="bubble" style={{ opacity: m.pending ? 0.7 : 1 }}>
           {m.meta?.attachments?.length > 0 && (
-            <div>{m.meta.attachments.map((a: any) => <span key={a.id} className="attach-chip"><Icon name="paperclip" size={12} />{a.filename ?? 'Attachment'}</span>)}</div>
+            <div>{m.meta.attachments.map((a: any) => a.kind === 'image'
+              ? <a key={a.id} href={`/knowledge/documents/${a.id}`} className="attach-thumb"><img src={`/api/documents/${a.id}/preview`} alt={a.filename ?? 'Attached image'} loading="lazy" /></a>
+              : <span key={a.id} className="attach-chip"><Icon name="paperclip" size={12} />{a.filename ?? 'Attachment'}</span>)}</div>
           )}
           {m.content}
         </div>
@@ -433,7 +436,7 @@ function Composer({ onSend, busy, onCancel, disabled }: { onSend: (text: string,
   const { me } = useSession();
   const toast = useToast();
   const [text, setText] = useState('');
-  const [files, setFiles] = useState<{ id: string; filename: string }[]>([]);
+  const [files, setFiles] = useState<{ id: string; filename: string; kind?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -460,7 +463,7 @@ function Composer({ onSend, busy, onCancel, disabled }: { onSend: (text: string,
     try {
       for (const f of [...list].slice(0, 5 - files.length)) {
         const r = await upload(f);
-        setFiles((x) => [...x, { id: r.document.id, filename: r.document.filename }]);
+        setFiles((x) => [...x, { id: r.document.id, filename: r.document.filename, kind: r.document.kind }]);
       }
     } catch (e: any) {
       toast(e.message, 'error');
@@ -476,7 +479,7 @@ function Composer({ onSend, busy, onCancel, disabled }: { onSend: (text: string,
         {files.length > 0 && (
           <div style={{ padding: '4px 6px 0' }}>
             {files.map((f) => (
-              <span key={f.id} className="attach-chip"><Icon name="paperclip" size={12} />{f.filename}
+              <span key={f.id} className="attach-chip">{f.kind === 'image' ? <img className="chip-thumb" src={`/api/documents/${f.id}/preview`} alt="" /> : <Icon name="paperclip" size={12} />}{f.filename}
                 <button className="btn ghost icon sm" style={{ width: 20, height: 20 }} onClick={() => setFiles(files.filter((x) => x.id !== f.id))} aria-label={`Remove ${f.filename}`}><Icon name="x" size={12} /></button>
               </span>
             ))}
@@ -496,8 +499,8 @@ function Composer({ onSend, busy, onCancel, disabled }: { onSend: (text: string,
           }}
         />
         <div className="bar">
-          <input ref={fileRef} type="file" hidden multiple accept=".pdf,.txt,.md,.markdown,.docx,.csv,.xlsx" onChange={(e) => attach(e.target.files)} />
-          <button className="btn ghost icon sm" onClick={() => fileRef.current?.click()} disabled={uploading || disabled} aria-label="Attach a file" title="Attach PDF, Word, text, CSV or Excel">
+          <input ref={fileRef} type="file" hidden multiple accept={`.pdf,.txt,.md,.markdown,.docx,.csv,.xlsx,${IMAGE_ACCEPT}`} onChange={(e) => attach(e.target.files)} />
+          <button className="btn ghost icon sm" onClick={() => fileRef.current?.click()} disabled={uploading || disabled} aria-label="Attach a file" title="Attach a photo, PDF, Word, text, CSV or Excel file">
             {uploading ? <Spinner /> : <Icon name="paperclip" size={17} />}
           </button>
           {me!.settings.voice.enabled && voice.supported && (

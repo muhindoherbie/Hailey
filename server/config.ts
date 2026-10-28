@@ -26,6 +26,8 @@ const schema = z.object({
   OPENAI_COMPAT_REASONING_EFFORT: z.string().max(20).optional(),
   /** core = everyday tools only (shorter prompt, much faster on small local models); full = all tools. */
   OPENAI_COMPAT_TOOLSET: z.enum(['core', 'full']).default('core'),
+  /** Set to true when the model can read images (e.g. llava, qwen2.5vl, gemma3, GPT-4o, Gemini). */
+  OPENAI_COMPAT_VISION: z.enum(['true', 'false']).default('false'),
   DEFAULT_PROVIDER: z.enum(['anthropic', 'openai_compat']).optional(),
 
   // Web research

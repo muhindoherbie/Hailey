@@ -38,6 +38,9 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
     return c.json({ error: 'Something went wrong on the server. Please try again.', code: 'internal' }, 500);
   });
 
+  // Shares normally go to the service worker; this only runs if it isn't installed yet.
+  app.post('/share-target', (c) => c.redirect('/share?error=no-sw', 303));
+
   app.get('/api/health', (c) => c.json({ ok: true, time: services.now().toISOString() }));
 
   // Digital Asset Links: proves the Hailey Android app and this site belong together.

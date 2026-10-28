@@ -5,10 +5,13 @@
 export type TextBlock = { type: 'text'; text: string };
 export type ToolUseBlock = { type: 'tool_use'; id: string; name: string; input: unknown };
 export type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
+export type ImageBlock = { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+/** Stored in history instead of the image bytes; expanded to an ImageBlock when sent. */
+export type ImageRefBlock = { type: 'image_ref'; document_id: string; filename: string };
 /** Opaque provider-specific blocks (e.g. Claude thinking blocks) replayed unchanged. */
 export type OpaqueBlock = { type: string; [k: string]: unknown };
 
-export type Block = TextBlock | ToolUseBlock | ToolResultBlock | OpaqueBlock;
+export type Block = TextBlock | ToolUseBlock | ToolResultBlock | ImageBlock | ImageRefBlock | OpaqueBlock;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -46,7 +49,7 @@ export interface ProviderInfo {
   label: string;
   model: string;
   configured: boolean;
-  capabilities: { tools: boolean; streaming: boolean; local: boolean; toolset?: 'core' | 'full' };
+  capabilities: { tools: boolean; streaming: boolean; local: boolean; toolset?: 'core' | 'full'; /** Can read images. */ vision?: boolean };
   /** USD per million tokens, when known. */
   pricing?: { input: number; output: number };
   note?: string;

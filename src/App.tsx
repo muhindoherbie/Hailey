@@ -19,6 +19,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Routines = lazy(() => import('./pages/Routines'));
 const Ramble = lazy(() => import('./pages/Ramble'));
+const Share = lazy(() => import('./pages/Share'));
 
 function Router() {
   const { pathname } = useLocation();
@@ -44,6 +45,7 @@ function Router() {
     ['/settings', () => <Settings />],
     ['/routines', () => <Routines />],
     ['/ramble', () => <Ramble />],
+    ['/share', () => <Share />],
   ];
   for (const [pattern, render] of routes) {
     const params = match(pattern, pathname);

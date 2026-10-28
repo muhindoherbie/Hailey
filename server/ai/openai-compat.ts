@@ -7,10 +7,10 @@ import { ProviderError } from './types.ts';
  * compatibility endpoint, etc. Streaming via SSE; tool calls when the model supports them.
  */
 export class OpenAICompatProvider implements AIProvider {
-  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full' };
+  private opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full'; vision?: boolean };
   private fetchImpl: typeof fetch;
 
-  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full' }, fetchImpl: typeof fetch = fetch) {
+  constructor(opts: { baseUrl?: string; apiKey?: string; model?: string; label: string; tools: boolean; reasoningEffort?: string; toolset?: 'core' | 'full'; vision?: boolean }, fetchImpl: typeof fetch = fetch) {
     this.opts = opts;
     this.fetchImpl = fetchImpl;
   }
@@ -26,7 +26,7 @@ export class OpenAICompatProvider implements AIProvider {
       label: this.opts.label,
       model: this.opts.model ?? '',
       configured,
-      capabilities: { tools: this.opts.tools, streaming: true, local, toolset: this.opts.toolset ?? 'core' },
+      capabilities: { tools: this.opts.tools, streaming: true, local, toolset: this.opts.toolset ?? 'core', vision: !!this.opts.vision },
       note: configured ? undefined : 'Set OPENAI_COMPAT_BASE_URL and OPENAI_COMPAT_MODEL on the server (e.g. Ollama at http://localhost:11434/v1).',
     };
   }
@@ -199,10 +199,19 @@ function toOpenAI(system: string, messages: ChatMessage[]) {
       out.push({ role: 'assistant', content: text || null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) });
     } else {
       const text = m.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
+      const images = m.content.filter((b: any) => b.type === 'image');
       for (const b of m.content as any[]) {
         if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: b.tool_use_id, content: b.content });
       }
-      if (text) out.push({ role: 'user', content: text });
+      if (images.length) {
+        out.push({
+          role: 'user',
+          content: [
+            ...(text ? [{ type: 'text', text }] : []),
+            ...images.map((b: any) => ({ type: 'image_url', image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } })),
+          ],
+        });
+      } else if (text) out.push({ role: 'user', content: text });
     }
   }
   return out;

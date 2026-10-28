@@ -38,7 +38,7 @@ export class AnthropicProvider implements AIProvider {
       label: 'Claude (Anthropic)',
       model: this.model,
       configured: !!this.client,
-      capabilities: { tools: true, streaming: true, local: false },
+      capabilities: { tools: true, streaming: true, local: false, vision: true },
       pricing: PRICING[this.model],
       note: this.client ? undefined : 'Set ANTHROPIC_API_KEY on the server to enable Claude.',
     };
