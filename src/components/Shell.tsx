@@ -15,6 +15,8 @@ const NAV = [
   { to: '/knowledge', label: 'Knowledge', icon: 'book', key: '5' },
   { to: '/research', label: 'Research', icon: 'globe', key: '6' },
   { to: '/memory', label: 'Memory', icon: 'brain', key: '7' },
+  { to: '/routines', label: 'Routines', icon: 'clock', key: '8' },
+  { to: '/discover', label: 'Discover', icon: 'sparkle', key: '9' },
 ];
 
 const isActive = (to: string, path: string) => (to === '/' ? path === '/' : path === to || path.startsWith(to + '/'));
@@ -39,7 +41,7 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPalette(true);
-      } else if (e.altKey && /^[1-7]$/.test(e.key)) {
+      } else if (e.altKey && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         navigate(NAV[Number(e.key) - 1].to);
       } else if (!typing && e.key === '/' && !e.ctrlKey && !e.metaKey) {
@@ -78,6 +80,8 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
           <Icon name="bell" /> Notifications
           {counts.unread > 0 && <span className="count">{counts.unread}</span>}
         </Link>
+        <Link to="/messaging" className={`nav-item ${isActive('/messaging', pathname) ? 'active' : ''}`}><Icon name="send" /> Messaging</Link>
+        <Link to="/connectors" className={`nav-item ${isActive('/connectors', pathname) ? 'active' : ''}`}><Icon name="link" /> Connected apps</Link>
         <Link to="/settings" className={`nav-item ${isActive('/settings', pathname) ? 'active' : ''}`}><Icon name="settings" /> Settings</Link>
         <div className="sidebar-footer">
           <div className="row" style={{ padding: '6px 8px' }}>
@@ -134,6 +138,9 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const commands = [
     { label: 'New chat', icon: 'chat', go: '/chat/new' },
     { label: 'Add a task', icon: 'plus', go: '/tasks?new=1' },
+    { label: 'Ramble it out (brain-dump into tasks)', icon: 'mic', go: '/ramble' },
+    { label: 'New routine', icon: 'clock', go: '/routines' },
+    { label: 'Connect an app (email, calendar…)', icon: 'link', go: '/connectors' },
     { label: 'New note', icon: 'note', go: '/knowledge?new=note' },
     { label: 'Upload a document', icon: 'upload', go: '/knowledge?tab=documents&upload=1' },
     { label: 'Research a topic', icon: 'globe', go: '/research' },

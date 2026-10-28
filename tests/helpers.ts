@@ -16,11 +16,12 @@ export class FakeProvider implements AIProvider {
   steps: ((req: ChatRequest) => ChatResult | Promise<ChatResult>)[] = [];
   configured = true;
   tools = true;
+  vision = false;
 
   info(): ProviderInfo {
     return {
       id: 'fake', label: 'Fake model', model: 'fake-1', configured: this.configured,
-      capabilities: { tools: this.tools, streaming: true, local: false }, pricing: { input: 1, output: 2 },
+      capabilities: { tools: this.tools, streaming: true, local: false, vision: this.vision }, pricing: { input: 1, output: 2 },
     };
   }
 

@@ -27,6 +27,14 @@ android {
         versionName appVersion
         manifestPlaceholders = [hostName: haileyHost]
         resValue 'string', 'launchUrl', "${haileyUrl}/"
+        // Puts Hailey in Android's Share menu; mirrors share_target in the web manifest (vite.config.ts).
+        def shareTarget = groovy.json.JsonOutput.toJson([
+            action: "${haileyUrl}/share-target", method: 'POST', enctype: 'multipart/form-data',
+            params: [title: 'title', text: 'text', url: 'url', files: [[name: 'files', accept: ['image/*', 'application/pdf', 'text/*',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']]]],
+        ])
+        resValue 'string', 'share_target', shareTarget.replace('"', '\\"')
         resValue 'string', 'asset_statements', "[{\\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"${haileyUrl}\\\"}}]"
     }
 

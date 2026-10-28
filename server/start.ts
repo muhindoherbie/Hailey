@@ -6,6 +6,7 @@ import { createRegistry } from './ai/providers.ts';
 import { createSearchService } from './services/search.ts';
 import { createPushService } from './services/push.ts';
 import { startScheduler } from './services/scheduler.ts';
+import { startTelegram } from './services/telegram.ts';
 import { createApp } from './app.ts';
 import type { Services } from './context.ts';
 
@@ -40,6 +41,7 @@ export function startHailey(opts: StartOptions = {}): Promise<RunningHailey> {
   };
   const app = createApp(services, { staticDir: opts.staticDir });
   const stopScheduler = startScheduler(services);
+  const stopTelegram = startTelegram(services);
 
   return new Promise((resolveStart, reject) => {
     const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) => {
@@ -56,6 +58,7 @@ export function startHailey(opts: StartOptions = {}): Promise<RunningHailey> {
         stop: () =>
           new Promise<void>((done) => {
             stopScheduler();
+            stopTelegram();
             server.close(() => {
               db.close();
               done();
@@ -66,6 +69,7 @@ export function startHailey(opts: StartOptions = {}): Promise<RunningHailey> {
     });
     server.on('error', (err: any) => {
       stopScheduler();
+      stopTelegram();
       db.close();
       reject(err?.code === 'EADDRINUSE' ? new Error(`Port ${config.PORT} is already in use — is Hailey already running?`) : err);
     });

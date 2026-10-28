@@ -1,3 +1,5 @@
+import { shrinkImage } from './images';
+
 /** Fetch wrapper for the Hailey API. Sends the CSRF header and turns errors into ApiError. */
 /** Lets API calls through free tunnel services (ngrok) without their browser warning page. */
 const TUNNEL_HEADERS = { 'ngrok-skip-browser-warning': '1' };
@@ -99,7 +101,7 @@ export async function streamPost(path: string, body: unknown, onEvent: (event: s
 
 export async function upload(file: File, extra: Record<string, string> = {}) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', await shrinkImage(file));
   for (const [k, v] of Object.entries(extra)) if (v) form.append(k, v);
   return api<{ document: any; chunks: number }>('/documents', { method: 'POST', form });
 }

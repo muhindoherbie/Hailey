@@ -50,6 +50,15 @@ describe.skipIf(!built)('installable PWA build', () => {
     expect(api.status).toBe(401); // unknown API paths never fall through to the HTML shell
   });
 
+  it('appears in the system Share menu, handled on the device by the service worker', async () => {
+    const m = JSON.parse(readFileSync(resolve(dist, 'manifest.webmanifest'), 'utf8'));
+    expect(m.share_target).toMatchObject({ action: '/share-target', method: 'POST', enctype: 'multipart/form-data' });
+    expect(m.share_target.params.files[0].accept).toEqual(expect.arrayContaining(['image/jpeg', 'application/pdf']));
+    expect(readFileSync(resolve(dist, 'sw.js'), 'utf8')).toContain('/share-target');
+    const page = await app.request('http://localhost/share?id=abc');
+    expect(await page.text()).toContain('<div id="root">');
+  });
+
   it('includes responsive layout rules for phones', () => {
     const css = readFileSync(resolve(dist, 'assets', require_css()), 'utf8');
     expect(css).toMatch(/@media[^{]*860px/);
@@ -64,6 +73,19 @@ function require_css() {
   const html = readFileSync(resolve(dist, 'index.html'), 'utf8');
   return html.match(/assets\/([^"]+\.css)/)![1];
 }
+
+describe('share target without a service worker', () => {
+  it('sends the user to a page that explains what to do', async () => {
+    const ctx = setup();
+    try {
+      const r = await ctx.app.request('http://localhost/share-target', { method: 'POST', body: new FormData() });
+      expect(r.status).toBe(303);
+      expect(r.headers.get('location')).toBe('/share?error=no-sw');
+    } finally {
+      ctx.cleanup();
+    }
+  });
+});
 
 describe('android asset links', () => {
   it('serves nothing until configured, then the app’s package and fingerprint', async () => {

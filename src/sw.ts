@@ -9,6 +9,32 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//, /^\/ics\//] }));
 
+// Items shared from other apps' Share menu. They are kept in a cache on this device only until
+// the user picks what to do with them on /share; nothing is sent to the server before that.
+const SHARE_CACHE = 'hailey-share';
+registerRoute(
+  ({ url, request }) => url.pathname === '/share-target' && request.method === 'POST',
+  async ({ request }) => {
+    try {
+      const form = await request.formData();
+      const id = crypto.randomUUID();
+      const cache = await caches.open(SHARE_CACHE);
+      const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0).slice(0, 5);
+      const meta = {
+        title: String(form.get('title') ?? ''), text: String(form.get('text') ?? ''), url: String(form.get('url') ?? ''),
+        files: files.map((f, i) => ({ index: i, name: f.name || `shared-${i + 1}`, type: f.type, size: f.size })),
+        at: Date.now(),
+      };
+      await cache.put(`/share-data/${id}/meta`, new Response(JSON.stringify(meta), { headers: { 'content-type': 'application/json' } }));
+      await Promise.all(files.map((f, i) => cache.put(`/share-data/${id}/file/${i}`, new Response(f, { headers: { 'content-type': f.type || 'application/octet-stream' } }))));
+      return Response.redirect(`/share?id=${id}`, 303);
+    } catch {
+      return Response.redirect('/share?error=read', 303);
+    }
+  },
+  'POST',
+);
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });

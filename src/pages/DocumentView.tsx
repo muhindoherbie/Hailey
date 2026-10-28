@@ -14,6 +14,7 @@ export default function DocumentView({ id }: { id: string }) {
   const { me } = useSession();
   const { data: d, error, loading, reload, setData } = useData<any>(`/documents/${id}`);
   const isSheet = d && (d.kind === 'csv' || d.kind === 'xlsx');
+  const isImage = d?.kind === 'image';
   const [sheet, setSheet] = useState('');
   const analysis = useData<any>(isSheet ? `/documents/${id}/analysis${sheet ? `?sheet=${encodeURIComponent(sheet)}` : ''}` : null);
   const [summarizing, setSummarizing] = useState(false);
@@ -36,7 +37,7 @@ export default function DocumentView({ id }: { id: string }) {
   };
   const ask = async () => {
     const conv = await post('/conversations', { project_id: d.project_id ?? null, title: d.filename });
-    sessionStorage.setItem(`hailey:first:${conv.id}`, JSON.stringify({ text: isSheet ? `Analyse this spreadsheet and tell me what stands out.` : `Help me understand this document. What are the most important points?`, attachments: [id] }));
+    sessionStorage.setItem(`hailey:first:${conv.id}`, JSON.stringify({ text: isSheet ? `Analyse this spreadsheet and tell me what stands out.` : isImage ? 'What can you tell me about this image?' : `Help me understand this document. What are the most important points?`, attachments: [id] }));
     navigate(`/chat/${conv.id}`);
   };
   const report = async (format: string) => {
@@ -60,11 +61,18 @@ export default function DocumentView({ id }: { id: string }) {
         <div className="page-head">
           <div className="grow">
             <h1 className="ellipsis">{d.filename}</h1>
-            <div className="sub small">{d.kind.toUpperCase()} · {fmtBytes(d.size)} · {d.text_chars.toLocaleString()} characters extracted · uploaded {fmtDateTime(d.created_at)}</div>
+            <div className="sub small">{d.kind.toUpperCase()} · {fmtBytes(d.size)}{isImage ? '' : ` · ${d.text_chars.toLocaleString()} characters extracted`} · uploaded {fmtDateTime(d.created_at)}</div>
           </div>
         </div>
 
-        {!isSheet && (
+        {isImage && (
+          <section className="card pad">
+            <img className="doc-image" src={`/api/documents/${id}/preview`} alt={d.filename} />
+            <p className="faint small" style={{ marginTop: 8 }}>Use <b>Ask Hailey</b> to have the AI look at this image. That needs a model that can view images, such as Claude.</p>
+          </section>
+        )}
+
+        {!isSheet && !isImage && (
           <section className="card pad stack">
             <div className="row"><h2 className="grow">Summary</h2>
               <button className="btn sm" onClick={summarize} disabled={summarizing || !ai}>{summarizing ? 'Summarising…' : d.summary ? 'Regenerate' : 'Summarise'}</button>
@@ -133,7 +141,7 @@ export default function DocumentView({ id }: { id: string }) {
           </section>
         )}
 
-        <section style={{ marginTop: 18 }}>
+        {!isImage && <section style={{ marginTop: 18 }}>
           <button className="btn ghost sm" onClick={() => setShowText((s) => !s)} aria-expanded={showText}><Icon name={showText ? 'chevronDown' : 'chevronRight'} size={14} />Extracted text ({d.chunks.length} sections)</button>
           {showText && (
             <div className="stack" style={{ marginTop: 10 }}>
@@ -142,7 +150,7 @@ export default function DocumentView({ id }: { id: string }) {
               ))}
             </div>
           )}
-        </section>
+        </section>}
 
         <div style={{ marginTop: 24 }}>
           <button className="btn danger sm" onClick={async () => {

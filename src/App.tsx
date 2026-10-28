@@ -17,6 +17,13 @@ const Memory = lazy(() => import('./pages/Memory'));
 const Actions = lazy(() => import('./pages/Actions'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Routines = lazy(() => import('./pages/Routines'));
+const Ramble = lazy(() => import('./pages/Ramble'));
+const Share = lazy(() => import('./pages/Share'));
+const Connectors = lazy(() => import('./pages/Connectors'));
+const Messaging = lazy(() => import('./pages/Messaging'));
+const Discover = lazy(() => import('./pages/Discover'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 function Router() {
   const { pathname } = useLocation();
@@ -24,6 +31,10 @@ function Router() {
   useSwNavigation();
   if (loading) return <Centered><Spinner lg /></Centered>;
   if (!me) return <Login />;
+  // First run: a short setup. Shared items and sign-in returns are never interrupted by it.
+  if (!me.settings.onboarded && !pathname.startsWith('/share') && !pathname.startsWith('/connectors')) {
+    return <Suspense fallback={<Centered><Spinner lg /></Centered>}><Onboarding /></Suspense>;
+  }
 
   const routes: [string, (p: Record<string, string>) => ReactNode][] = [
     ['/', () => <Home />],
@@ -40,6 +51,12 @@ function Router() {
     ['/actions', () => <Actions />],
     ['/notifications', () => <Notifications />],
     ['/settings', () => <Settings />],
+    ['/routines', () => <Routines />],
+    ['/ramble', () => <Ramble />],
+    ['/share', () => <Share />],
+    ['/connectors', () => <Connectors />],
+    ['/messaging', () => <Messaging />],
+    ['/discover', () => <Discover />],
   ];
   for (const [pattern, render] of routes) {
     const params = match(pattern, pathname);

@@ -10,6 +10,10 @@ import { getSettings, CONSEQUENTIAL_GUARD, type Settings } from '../services/set
 import * as tasks from '../services/tasks.ts';
 import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
+import * as routines from '../services/routines.ts';
+import { findPlaces, PlacesError } from '../services/places.ts';
+
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 import { searchIndex, type Entity } from '../services/indexer.ts';
 import { documentText, loadSheets, deleteDocument } from '../services/documents.ts';
 import { analyzeSheet } from '../services/spreadsheet.ts';
@@ -19,6 +23,8 @@ import { buildOverview } from '../services/briefing.ts';
 import { notify } from '../services/activity.ts';
 import { sha256 } from '../auth.ts';
 import { repoSummary, GitHubError, REPO_RE } from '../services/github.ts';
+import { findConnectorTool, callConnectorTool, TOOL_PREFIX } from '../services/connectors.ts';
+import { McpError } from '../services/mcp.ts';
 
 export type Risk = 'read' | 'reversible' | 'consequential';
 
@@ -40,6 +46,8 @@ export interface ToolDef<S extends z.ZodType = z.ZodType> {
   input: S;
   /** A human-readable statement of what the call will do, shown in approvals and history. */
   summarize: (input: z.infer<S>, ctx: ToolContext) => string;
+  /** Ask before running anything that isn't read-only, unless the user chose otherwise (connected apps). */
+  askByDefault?: boolean;
   run: (input: z.infer<S>, ctx: ToolContext) => Promise<unknown> | unknown;
 }
 
@@ -342,6 +350,78 @@ export const TOOLS: ToolDef[] = [
     },
   }),
   def({
+    name: 'find_places',
+    description: 'Find places (shops, pharmacies, restaurants, garages, hospitals, landmarks, addresses) using OpenStreetMap. Give what to look for and either a town/area in "near" or the user\'s shared coordinates. Returns names, addresses and map links; opening hours and ratings are not included.',
+    risk: 'read',
+    input: z.object({
+      query: z.string().min(2).max(200).describe('What to look for, e.g. "pharmacy" or "Garden City Mall"'),
+      near: z.string().max(200).optional().describe('Town, district or area, e.g. "Ntinda, Kampala"'),
+      lat: z.number().min(-90).max(90).optional(),
+      lon: z.number().min(-180).max(180).optional(),
+      limit: z.number().int().min(1).max(10).optional(),
+    }),
+    summarize: (i) => `Find places: ${i.query}${i.near ? ` near ${i.near}` : i.lat != null ? ' near your location' : ''}`,
+    run: async (i, ctx) => {
+      try {
+        const places = await findPlaces(ctx.services, i);
+        for (const p of places) ctx.sources.push({ title: p.name, url: p.osm_url, snippet: p.address });
+        return { places, note: places.length ? 'Data © OpenStreetMap contributors. Check opening hours before going.' : 'No matching places were found. Try a broader search or another area.' };
+      } catch (err) {
+        if (err instanceof PlacesError) throw new ToolError(err.message);
+        throw err;
+      }
+    },
+  }),
+  def({
+    name: 'prepare_call',
+    description: 'Save a phone-call plan as a note and return a tap-to-call link. Hailey cannot place calls itself: write the script (opening line, key points, questions, fallback if the answer is no) and the user makes the call.',
+    risk: 'reversible',
+    input: z.object({
+      who: z.string().min(1).max(120),
+      phone: z.string().max(40).optional().describe('Number to dial, if known'),
+      purpose: z.string().min(1).max(300),
+      script: z.string().min(10).max(5000).describe('The call script in Markdown'),
+    }),
+    summarize: (i) => `Prepare a call to ${i.who}`,
+    run: (i, ctx) => {
+      const digits = i.phone?.replace(/[^\d+]/g, '');
+      const note = knowledge.createNote(ctx.services.db, ctx.userId, {
+        title: `Call: ${i.who}`, tags: ['call'],
+        body: `**Purpose:** ${i.purpose}${digits ? `\n**Number:** [${i.phone}](tel:${digits})` : ''}\n\n${i.script}`,
+      });
+      return { note_id: note.id, dial_url: digits ? `tel:${digits}` : undefined, note: 'Saved as a note. The user places the call themselves.' };
+    },
+  }),
+  def({
+    name: 'list_routines',
+    description: 'List the user\'s routines: built-in briefings and their own scheduled routines (what each does, when it runs, whether it is on, and how its last run went).',
+    risk: 'read',
+    input: z.object({}),
+    summarize: () => 'List your routines',
+    run: (_i, ctx) => ({
+      routines: routines.listRoutines(ctx.services.db, ctx.userId).map((r) => ({
+        id: r.id, title: r.title, custom: r.custom, enabled: r.enabled, time: r.time_local, days: r.days,
+        prompt: r.prompt ?? undefined, last_run: r.last_run_at ?? undefined, last_status: r.last_status ?? undefined,
+      })),
+    }),
+  }),
+  def({
+    name: 'create_routine',
+    description: 'Create a scheduled routine: an instruction Hailey carries out on its own at a set local time on chosen weekdays (e.g. "every Friday 16:30 log my wins", "daily 9:00 check this price"). Results arrive as a notification and in the routine\'s own chat. Write the prompt as a complete instruction; confirm the time and days with the user first if they did not give them.',
+    risk: 'reversible',
+    input: z.object({
+      title: z.string().min(1).max(80),
+      prompt: z.string().min(5).max(2000).describe('What Hailey should do each time, written as an instruction'),
+      time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).describe('24-hour local time, HH:MM'),
+      days: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional().describe('Weekdays it runs: 0 = Sunday … 6 = Saturday. Omit for every day.'),
+    }),
+    summarize: (i) => `Create routine "${i.title}" at ${i.time}${i.days ? ` on ${i.days.map((d) => WEEKDAY_NAMES[d]).join(', ')}` : ' every day'}`,
+    run: (i, ctx) => {
+      const r = routines.createRoutine(ctx.services.db, ctx.userId, { title: i.title, prompt: i.prompt, time_local: i.time, days: i.days });
+      return { routine: { id: r.id, title: r.title, time: r.time_local, days: r.days }, manage_at: '/routines' };
+    },
+  }),
+  def({
     name: 'create_reminder',
     description: 'Schedule a push-notification reminder at a specific time (server-side; works while the app is closed if notifications are enabled on the device).',
     risk: 'reversible',
@@ -603,8 +683,27 @@ export function needsApproval(tool: ToolDef, settings: Settings, routineAllowed?
   if (routineAllowed?.has(tool.name)) return false;
   if (override === 'ask') return true;
   if (override === 'auto') return false;
+  if (tool.askByDefault && tool.risk !== 'read') return true;
   if (tool.risk === 'reversible') return !settings.permissions.autoReversible;
   return false;
+}
+
+/** Hailey's own tools, or a tool from one of the user's connected apps. */
+export function findTool(services: Services, userId: string, name: string): ToolDef | undefined {
+  const own = TOOL_MAP.get(name);
+  if (own) return own;
+  const found = findConnectorTool(services.db, userId, name);
+  if (!found) return undefined;
+  const { connector, tool } = found;
+  return {
+    name: tool.key, description: tool.description, risk: tool.risk, askByDefault: true,
+    input: z.record(z.string(), z.unknown()),
+    summarize: (i: Record<string, unknown>) => {
+      const args = JSON.stringify(i);
+      return `${connector.name}: ${tool.title ?? tool.name}${args !== '{}' ? ` ${args.length > 300 ? `${args.slice(0, 300)}…` : args}` : ''}`;
+    },
+    run: (i: Record<string, unknown>, ctx: ToolContext) => callConnectorTool(ctx.services, connector, tool, i),
+  } as ToolDef;
 }
 
 export function makeContext(services: Services, userId: string, conversationId: string | null): ToolContext {
@@ -626,8 +725,8 @@ export async function executeTool(
   origin: 'assistant' | 'routine' | 'user' = 'assistant',
   routineAllowed?: Set<string>,
 ): Promise<ToolOutcome> {
-  const tool = TOOL_MAP.get(name);
-  if (!tool) return { status: 'error', error: `Unknown tool "${name}".` };
+  const tool = findTool(ctx.services, ctx.userId, name);
+  if (!tool) return { status: 'error', error: name.startsWith(TOOL_PREFIX) ? `The connected app for "${name}" is switched off or was removed.` : `Unknown tool "${name}".` };
   const parsed = tool.input.safeParse(rawInput);
   if (!parsed.success) {
     return { status: 'error', error: `Invalid input for ${name}: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')}` };
@@ -670,7 +769,7 @@ async function runAction(ctx: ToolContext, tool: ToolDef, actionId: string, inpu
   } catch (err: any) {
     let msg = err instanceof ToolError || err instanceof HttpError ? err.message
       : err?.name === 'ZodError' ? `Invalid data: ${err.issues?.map((i: any) => i.message).join('; ')}`
-      : err?.constructor?.name === 'SearchUnavailableError' ? err.message
+      : err?.constructor?.name === 'SearchUnavailableError' || err instanceof McpError ? err.message
       : 'The action failed due to an internal error.';
     // Help the model recover when it guessed an id instead of looking it up.
     if (/^(Project|Workspace|Parent task|Task|Note|Document|Memory) not found$/.test(msg)) {
@@ -703,7 +802,7 @@ export async function approveAction(services: Services, userId: string, actionId
     db.run("UPDATE actions SET status = 'failed', error = 'Action payload changed after it was queued' WHERE id = ?", actionId);
     throw new HttpError(409, 'This action was modified after it was queued and has been blocked.', 'conflict');
   }
-  const tool = TOOL_MAP.get(a.tool);
+  const tool = findTool(services, userId, a.tool);
   const ctx = makeContext(services, userId, a.conversation_id);
   if (!tool) {
     db.run("UPDATE actions SET status = 'failed', error = 'Tool no longer exists' WHERE id = ?", actionId);

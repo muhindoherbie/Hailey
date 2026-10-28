@@ -68,6 +68,12 @@ export function chatRoutes() {
     return c.json({ conversation: { ...rest, archived: !!conv.archived }, messages, pendingActions: pending, streaming: inflight.has(conv.id) });
   });
 
+  r.patch('/messages/:id/rating', async (c) => {
+    const i = z.object({ rating: z.union([z.literal(-1), z.literal(0), z.literal(1)]) }).parse(await c.req.json());
+    const r = db(c).run("UPDATE messages SET meta = json_set(COALESCE(NULLIF(meta, ''), '{}'), '$.rating', ?) WHERE id = ? AND user_id = ? AND role = 'assistant'", i.rating, c.req.param('id'), uid(c));
+    if (Number(r.changes) === 0) throw notFound('Message');
+    return c.json({ rating: i.rating });
+  });
   r.patch('/conversations/:id', async (c) => {
     const i = z.object({
       title: z.string().trim().min(1).max(200).optional(), archived: z.boolean().optional(),

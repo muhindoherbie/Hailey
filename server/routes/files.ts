@@ -82,6 +82,18 @@ export function fileRoutes() {
     });
   });
 
+  /** Inline view for images only; other kinds are always downloaded, never rendered. */
+  r.get('/documents/:id/preview', (c) => {
+    const d = db(c).getOwned('documents', uid(c), c.req.param('id'));
+    if (!d) throw notFound('Document');
+    if (d.kind !== 'image') throw badRequest('Only images can be previewed.');
+    return c.body(new Uint8Array(readDocumentFile(d)), 200, {
+      'Content-Type': d.mime,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Cache-Control': 'private, max-age=3600',
+    });
+  });
+
   r.delete('/documents/:id', (c) => c.json(deleteDocument(db(c), uid(c), c.req.param('id'))));
 
   r.get('/documents/:id/analysis', async (c) => {
@@ -101,6 +113,7 @@ export function fileRoutes() {
   r.post('/documents/:id/summarize', rateLimit({ name: 'docsum', windowMs: 60_000, max: 6, key: (c) => c.var.user.id }), async (c) => {
     const d = db(c).getOwned('documents', uid(c), c.req.param('id'));
     if (!d) throw notFound('Document');
+    if (d.kind === 'image') throw badRequest('Images have no text to summarise. Attach the image in chat and ask Hailey about it.');
     const text = documentText(db(c), uid(c), d.id, 100_000);
     const out = await complete(
       c.var.services, uid(c),

@@ -9,8 +9,13 @@ export function speechSupported() {
   return typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 }
 
-export function useDictation(lang: string, onFinal: (text: string) => void) {
+/**
+ * `continuous` keeps listening through pauses (for long brain-dumps) until stop() is called;
+ * browsers end a session after a while, so it quietly starts a new one.
+ */
+export function useDictation(lang: string, onFinal: (text: string) => void, opts: { continuous?: boolean } = {}) {
   const [listening, setListening] = useState(false);
+  const wanted = useRef(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<string | null>(null);
   const rec = useRef<any>(null);
@@ -18,6 +23,7 @@ export function useDictation(lang: string, onFinal: (text: string) => void) {
   finalRef.current = onFinal;
 
   const stop = useCallback(() => {
+    wanted.current = false;
     rec.current?.stop();
   }, []);
 
@@ -31,7 +37,7 @@ export function useDictation(lang: string, onFinal: (text: string) => void) {
     const r = new SR();
     r.lang = lang || 'en-US';
     r.interimResults = true;
-    r.continuous = false;
+    r.continuous = !!opts.continuous;
     r.maxAlternatives = 1;
     r.onresult = (e: any) => {
       let fin = '';
@@ -52,22 +58,37 @@ export function useDictation(lang: string, onFinal: (text: string) => void) {
         network: 'Voice recognition needs an internet connection.',
         'audio-capture': 'No microphone was found.',
       };
+      if (e.error === 'no-speech' && wanted.current) return; // a pause, not a failure
+      wanted.current = false;
       if (e.error !== 'aborted') setError(msg[e.error] ?? `Voice input error: ${e.error}`);
     };
     r.onend = () => {
-      setListening(false);
       setInterim('');
+      if (wanted.current) {
+        try {
+          r.start();
+          return;
+        } catch {
+          wanted.current = false;
+        }
+      }
+      setListening(false);
     };
     rec.current = r;
     try {
+      wanted.current = !!opts.continuous;
       r.start();
       setListening(true);
     } catch {
+      wanted.current = false;
       setListening(false);
     }
-  }, [lang]);
+  }, [lang, opts.continuous]);
 
-  useEffect(() => () => rec.current?.abort?.(), []);
+  useEffect(() => () => {
+    wanted.current = false;
+    rec.current?.abort?.();
+  }, []);
   return { listening, interim, error, start, stop, supported: speechSupported(), clearError: () => setError(null) };
 }
 
@@ -86,6 +107,22 @@ export function speak(text: string, opts: { lang?: string; voiceName?: string } 
   if (voice) u.voice = voice;
   window.speechSynthesis.speak(u);
   return true;
+}
+
+/** Speaks and resolves when finished (or immediately when speech isn't available). */
+export function speakAsync(text: string, opts: { lang?: string; voiceName?: string } = {}) {
+  return new Promise<void>((resolve) => {
+    if (!('speechSynthesis' in window)) return resolve();
+    if (!speak(text, opts)) return resolve();
+    // speak() queued exactly one utterance; poll for the end, since onend is unreliable on some browsers.
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if ((!window.speechSynthesis.speaking && Date.now() - started > 300) || Date.now() - started > 120_000) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 200);
+  });
 }
 
 export function stopSpeaking() {

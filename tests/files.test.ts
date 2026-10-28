@@ -69,6 +69,16 @@ describe('document upload and processing', () => {
     }
   });
 
+  it('allows uploads up to 100 MB by default', async () => {
+    const c = await signup(ctx);
+    expect((await c.get('/api/documents/supported')).data.maxMb).toBe(100);
+    const line = 'Stock count for the Kampala branch was checked and recorded today.\n';
+    const body = line.repeat(Math.ceil((10 * 1024 * 1024) / line.length)).slice(0, 10 * 1024 * 1024);
+    const r = await c.req('POST', '/api/documents', fileForm('stock-log.txt', body));
+    expect(r.status).toBe(201);
+    expect(r.data.document.size).toBe(10 * 1024 * 1024);
+  }, 60_000);
+
   it('sanitises file names to prevent path tricks', async () => {
     const c = await signup(ctx);
     const r = await c.req('POST', '/api/documents', fileForm('../../etc/passwd.txt', 'hello'));

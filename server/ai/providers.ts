@@ -110,6 +110,7 @@ export function createRegistry(config: Config): ProviderRegistry {
       tools: config.OPENAI_COMPAT_TOOLS === 'true',
       reasoningEffort: config.OPENAI_COMPAT_REASONING_EFFORT,
       toolset: config.OPENAI_COMPAT_TOOLSET,
+      vision: config.OPENAI_COMPAT_VISION === 'true',
     }),
   );
   reg.setDefault(config.DEFAULT_PROVIDER);

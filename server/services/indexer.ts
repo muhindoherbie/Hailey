@@ -5,6 +5,14 @@ export type Entity = 'note' | 'task' | 'memory' | 'project' | 'doc_chunk' | 'con
 /** Keeps the FTS5 search index in step with the source tables. */
 export function indexEntity(db: Db, userId: string, entity: Entity, id: string, title: string, body: string, locator = '') {
   db.run('DELETE FROM search_index WHERE entity = ? AND entity_id = ? AND user_id = ?', entity, id, userId);
+  addToIndex(db, userId, entity, id, title, body, locator);
+}
+
+/**
+ * Indexes a row that has never been indexed. The UNINDEXED filter columns make every
+ * DELETE a full scan, so bulk inserts (a large document's chunks) must skip it.
+ */
+export function addToIndex(db: Db, userId: string, entity: Entity, id: string, title: string, body: string, locator = '') {
   db.run(
     'INSERT INTO search_index (title, body, entity, entity_id, user_id, locator) VALUES (?, ?, ?, ?, ?, ?)',
     title ?? '', body ?? '', entity, id, userId, locator,

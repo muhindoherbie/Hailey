@@ -9,7 +9,17 @@ export const settingsSchema = z.object({
     displayName: z.string().max(80).default(''),
     assistantStyle: z.enum(['balanced', 'concise', 'detailed', 'warm']).default('balanced'),
     customInstructions: z.string().max(2000).default(''),
-  }).default({ displayName: '', assistantStyle: 'balanced', customInstructions: '' }),
+    /** The assistant can be renamed; "Hailey" stays the app's name. */
+    assistantName: z.string().trim().max(40).default('Hailey'),
+    /** Notes on how the user writes, learned from samples, used when drafting in their voice. */
+    writingStyle: z.string().max(2000).default(''),
+    /** Language for replies; empty = match the user. */
+    replyLanguage: z.string().max(40).default(''),
+    /** A specialist mode unlocked through use (see services/achievements.ts). */
+    persona: z.enum(['none', 'chef', 'coach', 'tutor']).default('none'),
+    /** What the user said they want help with during onboarding (Discover ordering). */
+    interests: z.array(z.string().max(40)).max(20).default([]),
+  }).default({ displayName: '', assistantStyle: 'balanced', customInstructions: '', assistantName: 'Hailey', writingStyle: '', replyLanguage: '', persona: 'none', interests: [] }),
   ai: z.object({
     provider: z.string().max(40).optional(),
     model: z.string().max(80).optional(),

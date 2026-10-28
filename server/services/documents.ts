@@ -3,11 +3,14 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node
 import { join, extname, resolve } from 'node:path';
 import mammoth from 'mammoth';
 import type { Db, Row } from '../db/index.ts';
-import { indexEntity, unindexEntity } from './indexer.ts';
+import { addToIndex } from './indexer.ts';
 import { parseCsv, parseXlsx, sheetToText, type Sheet } from './spreadsheet.ts';
 import { badRequest, notFound } from '../context.ts';
 
-export type DocKind = 'pdf' | 'text' | 'markdown' | 'docx' | 'csv' | 'xlsx';
+export type DocKind = 'pdf' | 'text' | 'markdown' | 'docx' | 'csv' | 'xlsx' | 'image';
+
+/** Vision models accept images up to 5 MB; the app shrinks larger photos before uploading. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** The formats Hailey can actually process. Anything else is rejected. */
 export const SUPPORTED: Record<string, { kind: DocKind; mime: string }> = {
@@ -18,18 +21,38 @@ export const SUPPORTED: Record<string, { kind: DocKind; mime: string }> = {
   '.docx': { kind: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
   '.csv': { kind: 'csv', mime: 'text/csv' },
   '.xlsx': { kind: 'xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  '.jpg': { kind: 'image', mime: 'image/jpeg' },
+  '.jpeg': { kind: 'image', mime: 'image/jpeg' },
+  '.png': { kind: 'image', mime: 'image/png' },
+  '.webp': { kind: 'image', mime: 'image/webp' },
+  '.gif': { kind: 'image', mime: 'image/gif' },
 };
+
+/** Image type from its leading bytes, so a renamed file can't pass as another kind. */
+function imageMime(buf: Buffer): string | null {
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.subarray(0, 4).toString('latin1') === 'GIF8') return 'image/gif';
+  if (buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  return null;
+}
 
 /** Checks the extension and the file's actual leading bytes agree. */
 export function detectKind(filename: string, buf: Buffer): { kind: DocKind; mime: string } {
   const ext = extname(filename).toLowerCase();
   const spec = SUPPORTED[ext];
-  if (!spec) throw badRequest(`Unsupported file type "${ext || 'none'}". Supported: PDF, TXT, MD, DOCX, CSV, XLSX.`);
+  if (!spec) throw badRequest(`Unsupported file type "${ext || 'none'}". Supported: PDF, TXT, MD, DOCX, CSV, XLSX, and images (JPG, PNG, WebP, GIF).`);
   const head = buf.subarray(0, 8);
   const isPdf = head.subarray(0, 5).toString('latin1') === '%PDF-';
   const isZip = head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04;
   if (spec.kind === 'pdf' && !isPdf) throw badRequest('This file is not a valid PDF.');
   if ((spec.kind === 'docx' || spec.kind === 'xlsx') && !isZip) throw badRequest(`This file is not a valid ${ext.slice(1).toUpperCase()} document.`);
+  if (spec.kind === 'image') {
+    const mime = imageMime(buf);
+    if (!mime) throw badRequest('This file is not a valid JPG, PNG, WebP or GIF image.');
+    if (buf.length > MAX_IMAGE_BYTES) throw badRequest('Images can be up to 5 MB. Attach it from the Hailey app, which shrinks large photos automatically, or resize it first.');
+    return { kind: 'image', mime };
+  }
   if (['text', 'markdown', 'csv'].includes(spec.kind)) {
     if (isPdf || isZip || buf.subarray(0, 4096).includes(0)) throw badRequest('This file does not look like plain text.');
   }
@@ -92,6 +115,8 @@ export async function extract(kind: DocKind, buf: Buffer): Promise<Extracted> {
     case 'xlsx':
       sheets = await parseXlsx(buf);
       break;
+    case 'image':
+      break; // stored for viewing and for vision models; there is no text to index
   }
   if (sheets) {
     for (const s of sheets) {
@@ -149,7 +174,7 @@ export async function storeDocument(
     db.run('UPDATE documents SET storage_path = ? WHERE id = ?', path, doc.id);
     extracted.chunks.forEach((c, seq) => {
       const chunk = db.insert('doc_chunks', { user_id: userId, document_id: doc.id, seq, locator: c.locator, text: c.text });
-      indexEntity(db, userId, 'doc_chunk', chunk.id, filename, c.text, c.locator);
+      addToIndex(db, userId, 'doc_chunk', chunk.id, filename, c.text, c.locator);
     });
     return { doc: db.get('SELECT * FROM documents WHERE id = ?', doc.id)!, chunks: extracted.chunks.length };
   });
@@ -164,7 +189,11 @@ export function deleteDocument(db: Db, userId: string, id: string) {
   const doc = db.getOwned('documents', userId, id);
   if (!doc) throw notFound('Document');
   db.tx(() => {
-    for (const c of db.all('SELECT id FROM doc_chunks WHERE document_id = ?', id)) unindexEntity(db, userId, 'doc_chunk', c.id);
+    // One pass over the index for all chunks; a DELETE per chunk would scan it once each.
+    db.run(
+      "DELETE FROM search_index WHERE entity = 'doc_chunk' AND user_id = ? AND entity_id IN (SELECT id FROM doc_chunks WHERE document_id = ?)",
+      userId, id,
+    );
     db.deleteOwned('documents', userId, id);
   });
   if (doc.storage_path) rmSync(doc.storage_path, { force: true });
