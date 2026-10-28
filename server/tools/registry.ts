@@ -22,6 +22,8 @@ import { buildOverview } from '../services/briefing.ts';
 import { notify } from '../services/activity.ts';
 import { sha256 } from '../auth.ts';
 import { repoSummary, GitHubError, REPO_RE } from '../services/github.ts';
+import { findConnectorTool, callConnectorTool, TOOL_PREFIX } from '../services/connectors.ts';
+import { McpError } from '../services/mcp.ts';
 
 export type Risk = 'read' | 'reversible' | 'consequential';
 
@@ -43,6 +45,8 @@ export interface ToolDef<S extends z.ZodType = z.ZodType> {
   input: S;
   /** A human-readable statement of what the call will do, shown in approvals and history. */
   summarize: (input: z.infer<S>, ctx: ToolContext) => string;
+  /** Ask before running anything that isn't read-only, unless the user chose otherwise (connected apps). */
+  askByDefault?: boolean;
   run: (input: z.infer<S>, ctx: ToolContext) => Promise<unknown> | unknown;
 }
 
@@ -635,8 +639,27 @@ export function needsApproval(tool: ToolDef, settings: Settings, routineAllowed?
   if (routineAllowed?.has(tool.name)) return false;
   if (override === 'ask') return true;
   if (override === 'auto') return false;
+  if (tool.askByDefault && tool.risk !== 'read') return true;
   if (tool.risk === 'reversible') return !settings.permissions.autoReversible;
   return false;
+}
+
+/** Hailey's own tools, or a tool from one of the user's connected apps. */
+export function findTool(services: Services, userId: string, name: string): ToolDef | undefined {
+  const own = TOOL_MAP.get(name);
+  if (own) return own;
+  const found = findConnectorTool(services.db, userId, name);
+  if (!found) return undefined;
+  const { connector, tool } = found;
+  return {
+    name: tool.key, description: tool.description, risk: tool.risk, askByDefault: true,
+    input: z.record(z.string(), z.unknown()),
+    summarize: (i: Record<string, unknown>) => {
+      const args = JSON.stringify(i);
+      return `${connector.name}: ${tool.title ?? tool.name}${args !== '{}' ? ` ${args.length > 300 ? `${args.slice(0, 300)}…` : args}` : ''}`;
+    },
+    run: (i: Record<string, unknown>, ctx: ToolContext) => callConnectorTool(ctx.services, connector, tool, i),
+  } as ToolDef;
 }
 
 export function makeContext(services: Services, userId: string, conversationId: string | null): ToolContext {
@@ -658,8 +681,8 @@ export async function executeTool(
   origin: 'assistant' | 'routine' | 'user' = 'assistant',
   routineAllowed?: Set<string>,
 ): Promise<ToolOutcome> {
-  const tool = TOOL_MAP.get(name);
-  if (!tool) return { status: 'error', error: `Unknown tool "${name}".` };
+  const tool = findTool(ctx.services, ctx.userId, name);
+  if (!tool) return { status: 'error', error: name.startsWith(TOOL_PREFIX) ? `The connected app for "${name}" is switched off or was removed.` : `Unknown tool "${name}".` };
   const parsed = tool.input.safeParse(rawInput);
   if (!parsed.success) {
     return { status: 'error', error: `Invalid input for ${name}: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')}` };
@@ -702,7 +725,7 @@ async function runAction(ctx: ToolContext, tool: ToolDef, actionId: string, inpu
   } catch (err: any) {
     let msg = err instanceof ToolError || err instanceof HttpError ? err.message
       : err?.name === 'ZodError' ? `Invalid data: ${err.issues?.map((i: any) => i.message).join('; ')}`
-      : err?.constructor?.name === 'SearchUnavailableError' ? err.message
+      : err?.constructor?.name === 'SearchUnavailableError' || err instanceof McpError ? err.message
       : 'The action failed due to an internal error.';
     // Help the model recover when it guessed an id instead of looking it up.
     if (/^(Project|Workspace|Parent task|Task|Note|Document|Memory) not found$/.test(msg)) {
@@ -735,7 +758,7 @@ export async function approveAction(services: Services, userId: string, actionId
     db.run("UPDATE actions SET status = 'failed', error = 'Action payload changed after it was queued' WHERE id = ?", actionId);
     throw new HttpError(409, 'This action was modified after it was queued and has been blocked.', 'conflict');
   }
-  const tool = TOOL_MAP.get(a.tool);
+  const tool = findTool(services, userId, a.tool);
   const ctx = makeContext(services, userId, a.conversation_id);
   if (!tool) {
     db.run("UPDATE actions SET status = 'failed', error = 'Tool no longer exists' WHERE id = ?", actionId);

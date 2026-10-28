@@ -38,6 +38,10 @@ const schema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   GITHUB_API_URL: z.string().default('https://api.github.com'),
 
+  // Connected apps (MCP). Connectors on the server's own network (localhost, 192.168.x.x…) are
+  // refused unless this is true — only turn it on if you run MCP servers on that network yourself.
+  MCP_ALLOW_PRIVATE_NETWORK: z.enum(['true', 'false']).default('false'),
+
   // Web push (generate with `npm run setup`)
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),

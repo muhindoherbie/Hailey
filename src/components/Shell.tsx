@@ -79,6 +79,7 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
           <Icon name="bell" /> Notifications
           {counts.unread > 0 && <span className="count">{counts.unread}</span>}
         </Link>
+        <Link to="/connectors" className={`nav-item ${isActive('/connectors', pathname) ? 'active' : ''}`}><Icon name="link" /> Connected apps</Link>
         <Link to="/settings" className={`nav-item ${isActive('/settings', pathname) ? 'active' : ''}`}><Icon name="settings" /> Settings</Link>
         <div className="sidebar-footer">
           <div className="row" style={{ padding: '6px 8px' }}>
@@ -137,6 +138,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     { label: 'Add a task', icon: 'plus', go: '/tasks?new=1' },
     { label: 'Ramble it out (brain-dump into tasks)', icon: 'mic', go: '/ramble' },
     { label: 'New routine', icon: 'clock', go: '/routines' },
+    { label: 'Connect an app (email, calendar…)', icon: 'link', go: '/connectors' },
     { label: 'New note', icon: 'note', go: '/knowledge?new=note' },
     { label: 'Upload a document', icon: 'upload', go: '/knowledge?tab=documents&upload=1' },
     { label: 'Research a topic', icon: 'globe', go: '/research' },

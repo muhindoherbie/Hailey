@@ -6,6 +6,7 @@ import { post } from '../lib/api';
 import { Link } from '../lib/router';
 import { useSession } from '../lib/session';
 import { useDictation } from '../lib/voice';
+import { fromLocalInput, toLocalInput } from '../lib/format';
 
 type Item = {
   type: 'task' | 'reminder' | 'note';
@@ -22,13 +23,6 @@ type Item = {
 
 const TYPE_ICON = { task: 'tasks', reminder: 'bell', note: 'note' } as const;
 const TYPE_LABEL = { task: 'Task', reminder: 'Reminder', note: 'Note' } as const;
-
-/** <input type="datetime-local"> wants local wall-clock time without a zone. */
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 export default function Ramble() {
   const toast = useToast();
@@ -128,7 +122,7 @@ export default function Ramble() {
                             {i.type !== 'note' && (
                               <input type="datetime-local" className="input" style={{ width: 'auto' }} aria-label="When"
                                 value={i.when_iso ? toLocalInput(i.when_iso) : ''}
-                                onChange={(e) => edit(n, { when_iso: e.target.value ? new Date(e.target.value).toISOString() : null, all_day: false, warning: undefined })} />
+                                onChange={(e) => edit(n, { when_iso: e.target.value ? fromLocalInput(e.target.value) : null, all_day: false, warning: undefined })} />
                             )}
                             {i.type !== 'note' && i.when_text && <span className="faint">from “{i.when_text}”</span>}
                             {i.priority === 1 && <span className="badge danger">urgent</span>}

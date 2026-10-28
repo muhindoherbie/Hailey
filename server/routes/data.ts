@@ -8,6 +8,7 @@ import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
 import * as routines from '../services/routines.ts';
 import { extractRamble, applyRamble, MAX_RAMBLE_CHARS } from '../services/ramble.ts';
+import * as connectors from '../services/connectors.ts';
 import { getSettings, updateSettings } from '../services/settings.ts';
 import { buildOverview, briefingText, suggestions } from '../services/briefing.ts';
 import { searchIndex } from '../services/indexer.ts';
@@ -348,6 +349,13 @@ export function dataRoutes() {
       throw err;
     }
   });
+
+  // ---------- Connected apps (MCP) ----------
+  r.get('/connectors', (c) => c.json({ connectors: connectors.listConnectors(db(c), uid(c)), allowPrivate: c.var.services.config.MCP_ALLOW_PRIVATE_NETWORK === 'true' }));
+  r.post('/connectors', async (c) => c.json(await connectors.addConnector(c.var.services, uid(c), await body(c)), 201));
+  r.post('/connectors/:id/refresh', async (c) => c.json(await connectors.refreshConnector(c.var.services, uid(c), c.req.param('id'))));
+  r.patch('/connectors/:id', async (c) => c.json(connectors.updateConnector(c.var.services, uid(c), c.req.param('id'), await body(c))));
+  r.delete('/connectors/:id', (c) => c.json(connectors.deleteConnector(db(c), uid(c), c.req.param('id'))));
 
   // ---------- Ramble (brain-dump → tasks, reminders, notes) ----------
   r.post('/ramble/extract', async (c) => {
