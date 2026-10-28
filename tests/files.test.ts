@@ -69,8 +69,9 @@ describe('document upload and processing', () => {
     }
   });
 
-  it('accepts a 10 MB file with the default upload limit', async () => {
+  it('allows uploads up to 100 MB by default', async () => {
     const c = await signup(ctx);
+    expect((await c.get('/api/documents/supported')).data.maxMb).toBe(100);
     const line = 'Stock count for the Kampala branch was checked and recorded today.\n';
     const body = line.repeat(Math.ceil((10 * 1024 * 1024) / line.length)).slice(0, 10 * 1024 * 1024);
     const r = await c.req('POST', '/api/documents', fileForm('stock-log.txt', body));

@@ -45,7 +45,7 @@ const schema = z.object({
   ANDROID_PACKAGE_NAME: z.string().max(200).optional(),
   ANDROID_CERT_SHA256: z.string().max(2000).optional(),
 
-  MAX_UPLOAD_MB: z.coerce.number().default(15),
+  MAX_UPLOAD_MB: z.coerce.number().default(100),
   DAILY_TOKEN_LIMIT: z.coerce.number().int().default(400000),
 });
 

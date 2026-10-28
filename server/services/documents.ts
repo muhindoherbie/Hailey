@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node
 import { join, extname, resolve } from 'node:path';
 import mammoth from 'mammoth';
 import type { Db, Row } from '../db/index.ts';
-import { indexEntity, unindexEntity } from './indexer.ts';
+import { addToIndex } from './indexer.ts';
 import { parseCsv, parseXlsx, sheetToText, type Sheet } from './spreadsheet.ts';
 import { badRequest, notFound } from '../context.ts';
 
@@ -149,7 +149,7 @@ export async function storeDocument(
     db.run('UPDATE documents SET storage_path = ? WHERE id = ?', path, doc.id);
     extracted.chunks.forEach((c, seq) => {
       const chunk = db.insert('doc_chunks', { user_id: userId, document_id: doc.id, seq, locator: c.locator, text: c.text });
-      indexEntity(db, userId, 'doc_chunk', chunk.id, filename, c.text, c.locator);
+      addToIndex(db, userId, 'doc_chunk', chunk.id, filename, c.text, c.locator);
     });
     return { doc: db.get('SELECT * FROM documents WHERE id = ?', doc.id)!, chunks: extracted.chunks.length };
   });
@@ -164,7 +164,11 @@ export function deleteDocument(db: Db, userId: string, id: string) {
   const doc = db.getOwned('documents', userId, id);
   if (!doc) throw notFound('Document');
   db.tx(() => {
-    for (const c of db.all('SELECT id FROM doc_chunks WHERE document_id = ?', id)) unindexEntity(db, userId, 'doc_chunk', c.id);
+    // One pass over the index for all chunks; a DELETE per chunk would scan it once each.
+    db.run(
+      "DELETE FROM search_index WHERE entity = 'doc_chunk' AND user_id = ? AND entity_id IN (SELECT id FROM doc_chunks WHERE document_id = ?)",
+      userId, id,
+    );
     db.deleteOwned('documents', userId, id);
   });
   if (doc.storage_path) rmSync(doc.storage_path, { force: true });

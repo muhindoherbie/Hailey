@@ -119,7 +119,7 @@ function Documents({ autoUpload, projectId }: { autoUpload: boolean; projectId?:
         {busy ? <><span className="spinner" style={{ verticalAlign: 'middle' }} /> Processing {busy}…</> : (
           <>
             <Icon name="upload" size={22} /><div style={{ fontWeight: 600, marginTop: 6 }}>Drop files here or click to upload</div>
-            <div className="small faint">PDF (with selectable text), Word (.docx), text, Markdown, CSV and Excel (.xlsx) · up to {supported.data?.maxMb ?? 15} MB · macros and formulas are never run</div>
+            <div className="small faint">PDF (with selectable text), Word (.docx), text, Markdown, CSV and Excel (.xlsx) · up to {supported.data?.maxMb ?? 100} MB · macros and formulas are never run</div>
           </>
         )}
       </div>
