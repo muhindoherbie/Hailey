@@ -41,10 +41,12 @@ export function Home() {
     ),
     quick: () => (
       <section aria-label="Quick actions" className="quick">
+        <Link to="/ramble"><span className="qi"><Icon name="mic" /></span>Ramble it out</Link>
         <Link to="/tasks?new=1"><span className="qi"><Icon name="plus" /></span>Add task</Link>
         <Link to="/knowledge?new=note"><span className="qi"><Icon name="note" /></span>New note</Link>
         <Link to="/knowledge?tab=documents&upload=1"><span className="qi"><Icon name="upload" /></span>Upload document</Link>
         <Link to="/research"><span className="qi"><Icon name="globe" /></span>Research</Link>
+        <Link to="/routines"><span className="qi"><Icon name="clock" /></span>Routines</Link>
       </section>
     ),
     today: () => data && (

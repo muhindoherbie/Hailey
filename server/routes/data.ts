@@ -7,6 +7,7 @@ import * as tasks from '../services/tasks.ts';
 import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
 import * as routines from '../services/routines.ts';
+import { extractRamble, applyRamble, MAX_RAMBLE_CHARS } from '../services/ramble.ts';
 import { getSettings, updateSettings } from '../services/settings.ts';
 import { buildOverview, briefingText, suggestions } from '../services/briefing.ts';
 import { searchIndex } from '../services/indexer.ts';
@@ -347,6 +348,13 @@ export function dataRoutes() {
       throw err;
     }
   });
+
+  // ---------- Ramble (brain-dump → tasks, reminders, notes) ----------
+  r.post('/ramble/extract', async (c) => {
+    const i = z.object({ text: z.string().max(MAX_RAMBLE_CHARS + 1000) }).parse(await body(c));
+    return c.json(await extractRamble(c.var.services, uid(c), i.text));
+  });
+  r.post('/ramble/apply', async (c) => c.json(applyRamble(db(c), uid(c), await body(c), c.var.services.now()), 201));
 
   // ---------- Usage ----------
   r.get('/usage', (c) => {

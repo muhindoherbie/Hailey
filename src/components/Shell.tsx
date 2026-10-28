@@ -135,6 +135,8 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const commands = [
     { label: 'New chat', icon: 'chat', go: '/chat/new' },
     { label: 'Add a task', icon: 'plus', go: '/tasks?new=1' },
+    { label: 'Ramble it out (brain-dump into tasks)', icon: 'mic', go: '/ramble' },
+    { label: 'New routine', icon: 'clock', go: '/routines' },
     { label: 'New note', icon: 'note', go: '/knowledge?new=note' },
     { label: 'Upload a document', icon: 'upload', go: '/knowledge?tab=documents&upload=1' },
     { label: 'Research a topic', icon: 'globe', go: '/research' },

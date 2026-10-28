@@ -496,7 +496,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .ask input { flex: 1; border: 0; background: none; outline: none; min-height: 42px; font-size: 1.02em; min-width: 0; }
 .ask:focus-within { border-color: var(--focus); }
-.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 680px) { .quick { grid-template-columns: repeat(2, 1fr); } }
 .quick button, .quick a {
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; border-radius: var(--r); border: 1px solid var(--border);
@@ -568,3 +568,5 @@ table.data th { font-weight: 650; color: var(--text-2); background: var(--surfac
 .day-pick { min-width: 34px; padding-inline: 0; justify-content: center; }
 .routine-result { margin-top: 6px; max-height: 220px; overflow: auto; }
 .warn-text { color: var(--warning); }
+.ramble-item.off { opacity: 0.55; }
+.ramble-check { width: 20px; height: 20px; margin-top: 9px; accent-color: var(--brand); flex: none; }
