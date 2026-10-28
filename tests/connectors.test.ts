@@ -241,3 +241,87 @@ describe('connected apps (MCP)', () => {
     expect(resultText({ content: [{ type: 'text', text: 'a' }, { type: 'image', data: 'x' }] })).toBe('a\n\n[image content not shown]');
   });
 });
+
+describe('signing in with the app (MCP OAuth)', () => {
+  it('discovers the sign-in server, registers, exchanges the code with PKCE and refreshes tokens', async () => {
+    const { createHash } = await import('node:crypto');
+    let base = '';
+    let challenge = '';
+    const valid = new Set<string>();
+    const seenTokens: string[] = [];
+    const server = createServer(async (req, res) => {
+      let raw = '';
+      for await (const ch of req) raw += ch;
+      const json = (b: unknown, status = 200, headers: Record<string, string> = {}) => res.writeHead(status, { 'content-type': 'application/json', ...headers }).end(JSON.stringify(b));
+      const url = new URL(req.url!, base);
+      if (url.pathname === '/.well-known/oauth-protected-resource') return json({ resource: `${base}/mcp`, authorization_servers: [base] });
+      if (url.pathname === '/.well-known/oauth-authorization-server') return json({ issuer: base, authorization_endpoint: `${base}/authorize`, token_endpoint: `${base}/token`, registration_endpoint: `${base}/register`, code_challenge_methods_supported: ['S256'] });
+      if (url.pathname === '/register') return json({ client_id: 'hailey-client' }, 201);
+      if (url.pathname === '/token') {
+        const p = new URLSearchParams(raw);
+        if (p.get('grant_type') === 'authorization_code') {
+          const ok = p.get('code') === 'good' && createHash('sha256').update(p.get('code_verifier')!).digest('base64url') === challenge && p.get('client_id') === 'hailey-client';
+          if (!ok) return json({ error: 'invalid_grant' }, 400);
+          valid.add('at1');
+          return json({ access_token: 'at1', refresh_token: 'rt1', expires_in: 3600 });
+        }
+        if (p.get('grant_type') === 'refresh_token' && p.get('refresh_token') === 'rt1') {
+          valid.add('at2');
+          return json({ access_token: 'at2', expires_in: 3600 });
+        }
+        return json({ error: 'invalid_grant' }, 400);
+      }
+      if (url.pathname === '/mcp') {
+        const tok = (req.headers.authorization ?? '').replace(/^Bearer /, '');
+        if (!valid.has(tok)) return json({}, 401, { 'www-authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"` });
+        const body = JSON.parse(raw);
+        if (!('id' in body)) return res.writeHead(202).end();
+        seenTokens.push(tok);
+        const result = body.method === 'initialize' ? { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'Notes app' } }
+          : body.method === 'tools/list' ? { tools: [{ name: 'search_pages', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } }] }
+          : { content: [{ type: 'text', text: 'Page: Shop ideas' }] };
+        return json({ jsonrpc: '2.0', id: body.id, result });
+      }
+      res.writeHead(404).end();
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    base = `http://127.0.0.1:${(server.address() as any).port}`;
+    try {
+      const c = await signup(ctx);
+      // Without a token, adding it says sign-in is needed.
+      const plain = await c.post('/api/connectors', { name: 'Notes', url: `${base}/mcp` });
+      expect(plain.data.code).toBe('needs_sign_in');
+      const start = await c.post('/api/connectors/oauth/start', { name: 'Notes', url: `${base}/mcp` });
+      expect(start.status).toBe(200);
+      const auth = new URL(start.data.authorize_url);
+      expect(auth.origin + auth.pathname).toBe(`${base}/authorize`);
+      expect(auth.searchParams.get('code_challenge_method')).toBe('S256');
+      expect(auth.searchParams.get('redirect_uri')).toBe('http://localhost/api/connectors/oauth/callback');
+      expect(auth.searchParams.get('resource')).toBe(`${base}/mcp`);
+      challenge = auth.searchParams.get('code_challenge')!;
+      const state = auth.searchParams.get('state')!;
+
+      // A wrong state is refused; the right one completes sign-in.
+      const bad = await c.get(`/api/connectors/oauth/callback?code=good&state=nope`);
+      expect(bad.headers.get('location')).toMatch(/oauth_error=/);
+      const done = await c.get(`/api/connectors/oauth/callback?code=good&state=${state}`);
+      expect(done.status).toBe(302);
+      expect(done.headers.get('location')).toBe('/connectors?connected=Notes');
+      const list = (await c.get('/api/connectors')).data.connectors;
+      expect(list[0]).toMatchObject({ name: 'Notes', signed_in: true, server_name: 'Notes app' });
+      expect(JSON.stringify(list)).not.toContain('at1');
+      // The state can't be replayed.
+      expect((await c.get(`/api/connectors/oauth/callback?code=good&state=${state}`)).headers.get('location')).toMatch(/expired/);
+
+      // Two hours later the access token has expired: Hailey refreshes it before calling the tool.
+      ctx.clock.now = new Date(ctx.clock.now.getTime() + 2 * 3600_000);
+      ctx.provider.steps.push(() => toolCall('mcp_notes_search_pages', {}));
+      ctx.provider.steps.push(() => text('Found it.'));
+      await chat(c, 'find my shop ideas page');
+      expect(seenTokens.at(-1)).toBe('at2');
+      expect(JSON.stringify(ctx.provider.calls[1].messages.at(-1))).toContain('Page: Shop ideas');
+    } finally {
+      await new Promise((r) => server.close(() => r(undefined)));
+    }
+  });
+});

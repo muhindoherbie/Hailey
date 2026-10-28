@@ -9,6 +9,7 @@ import * as knowledge from '../services/knowledge.ts';
 import * as routines from '../services/routines.ts';
 import { extractRamble, applyRamble, MAX_RAMBLE_CHARS } from '../services/ramble.ts';
 import * as connectors from '../services/connectors.ts';
+import { startOAuth, finishOAuth } from '../services/mcp-oauth.ts';
 import * as achievements from '../services/achievements.ts';
 import { DISCOVER } from '../services/discover.ts';
 import * as channels from '../services/channels.ts';
@@ -393,6 +394,23 @@ export function dataRoutes() {
   // ---------- Connected apps (MCP) ----------
   r.get('/connectors', (c) => c.json({ connectors: connectors.listConnectors(db(c), uid(c)), allowPrivate: c.var.services.config.MCP_ALLOW_PRIVATE_NETWORK === 'true' }));
   r.post('/connectors', connectLimit, async (c) => c.json(await connectors.addConnector(c.var.services, uid(c), await body(c)), 201));
+  r.post('/connectors/oauth/start', connectLimit, async (c) => {
+    const i = z.object({ name: z.string().trim().min(1).max(40), url: z.string().trim().min(8).max(500) }).parse(await body(c));
+    return c.json(await startOAuth(c.var.services, uid(c), i.name, i.url));
+  });
+  /** The app sends the browser back here after sign-in. */
+  r.get('/connectors/oauth/callback', async (c) => {
+    const { code, state, error, error_description } = c.req.query();
+    const back = (q: Record<string, string>) => c.redirect(`/connectors?${new URLSearchParams(q)}`, 302);
+    if (error || !code || !state) return back({ oauth_error: (error_description || error || 'Sign-in was cancelled.').slice(0, 200) });
+    try {
+      const done = await finishOAuth(c.var.services, uid(c), state, code);
+      const conn = await connectors.addOAuthConnector(c.var.services, uid(c), done.name, done.url, done.tokens);
+      return back({ connected: conn.name });
+    } catch (e: any) {
+      return back({ oauth_error: String(e?.message ?? 'Sign-in failed.').slice(0, 200) });
+    }
+  });
   r.post('/connectors/:id/refresh', connectLimit, async (c) => c.json(await connectors.refreshConnector(c.var.services, uid(c), c.req.param('id'))));
   r.patch('/connectors/:id', async (c) => c.json(connectors.updateConnector(c.var.services, uid(c), c.req.param('id'), await body(c))));
   r.delete('/connectors/:id', (c) => c.json(connectors.deleteConnector(db(c), uid(c), c.req.param('id'))));

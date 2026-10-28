@@ -6,6 +6,7 @@ import { parseJson, nowIso } from '../db/index.ts';
 import type { ToolSpec } from '../ai/types.ts';
 import { McpClient, McpError, checkConnectorUrl, resultText, type McpTool } from './mcp.ts';
 import { encryptSecret, decryptSecret } from './secrets.ts';
+import { freshAccessToken, type OAuthTokens } from './mcp-oauth.ts';
 import { getSettings, updateSettings } from './settings.ts';
 
 export const MAX_CONNECTORS = 10;
@@ -85,17 +86,30 @@ function cacheTools(slug: string, connectorName: string, tools: McpTool[]): Cach
   return out;
 }
 
-function clientFor(services: Services, c: Row) {
-  const token = c.auth_secret ? decryptSecret(services.config.DATA_DIR, c.auth_secret) : null;
-  if (c.auth_secret && token === null) throw new McpError('The saved access token can no longer be read (the server’s secret key changed, e.g. after a restore). Enter the token again.');
-  const header = authHeader(token);
+/** The saved secret is either a token the user pasted or tokens from signing in with the app. */
+function readSecret(services: Services, c: Row): { token: string | null; oauth: OAuthTokens | null } {
+  if (!c.auth_secret) return { token: null, oauth: null };
+  const raw = decryptSecret(services.config.DATA_DIR, c.auth_secret);
+  if (raw === null) throw new McpError('The saved access token can no longer be read (the server’s secret key changed, e.g. after a restore). Enter the token or sign in again.');
+  if (raw.startsWith('{"type":"oauth"')) return { token: null, oauth: JSON.parse(raw) as OAuthTokens };
+  return { token: raw, oauth: null };
+}
+
+async function clientFor(services: Services, c: Row) {
+  const { token, oauth } = readSecret(services, c);
+  let header = authHeader(token);
+  if (oauth) {
+    const fresh = await freshAccessToken(services, oauth);
+    if (fresh.updated) services.db.run('UPDATE connectors SET auth_secret = ? WHERE id = ?', encryptSecret(services.config.DATA_DIR, JSON.stringify(fresh.updated)), c.id);
+    header = `Bearer ${fresh.token}`;
+  }
   return new McpClient(c.url, header ? { authorization: header } : {}, services.mcpFetch);
 }
 
 export function presentConnector(db: Db, userId: string, c: Row) {
   const modes = getSettings(db, userId).permissions.tools;
   return {
-    id: c.id, name: c.name, url: c.url, enabled: !!c.enabled, has_token: !!c.auth_secret, server_name: c.server_name,
+    id: c.id, name: c.name, url: c.url, enabled: !!c.enabled, has_token: !!c.auth_secret, signed_in: !!c.auth_secret && (c.auth_kind === 'oauth'), server_name: c.server_name,
     last_error: c.last_error, last_checked_at: c.last_checked_at, created_at: c.created_at,
     tools: parseJson<CachedTool[]>(c.tools, []).map((t) => ({
       key: t.key, name: t.name, title: t.title, description: t.description.replace(/^\[Connected app “[^”]*”\] /, ''), risk: t.risk,
@@ -124,16 +138,40 @@ export async function addConnector(services: Services, userId: string, raw: unkn
     info = await client.initialize();
     tools = await client.listTools();
   } catch (e: any) {
+    if (e instanceof McpError && /refused the access token/.test(e.message) && !i.token) {
+      throw new HttpError(400, 'This app asks you to sign in. Use “Sign in with the app”, or paste an access token.', 'needs_sign_in');
+    }
     throw badRequest(e instanceof McpError ? e.message : 'Could not connect to that app.');
   }
-  const slug = uniqueSlug(db, userId, i.name);
+  return saveConnector(services, userId, i.name, url.href, i.token ? i.token : null, 'token', info, tools);
+}
+
+function saveConnector(services: Services, userId: string, name: string, url: string, secret: string | null, kind: 'token' | 'oauth', info: any, tools: McpTool[]) {
+  const { db } = services;
+  const slug = uniqueSlug(db, userId, name);
   const row = db.insert('connectors', {
-    user_id: userId, name: i.name, slug, url: url.href,
-    auth_secret: i.token ? encryptSecret(services.config.DATA_DIR, i.token) : null,
-    tools: JSON.stringify(cacheTools(slug, i.name, tools)), server_name: info?.serverInfo?.name?.slice(0, 120) ?? null,
+    user_id: userId, name, slug, url,
+    auth_secret: secret ? encryptSecret(services.config.DATA_DIR, secret) : null, auth_kind: secret ? kind : null,
+    tools: JSON.stringify(cacheTools(slug, name, tools)), server_name: info?.serverInfo?.name?.slice(0, 120) ?? null,
     last_checked_at: nowIso(),
   });
   return presentConnector(db, userId, row);
+}
+
+/** Completes "sign in with the app": connects with the new tokens and saves the connector. */
+export async function addOAuthConnector(services: Services, userId: string, name: string, url: string, tokens: OAuthTokens) {
+  const { db } = services;
+  if (Number(db.get('SELECT COUNT(*) AS n FROM connectors WHERE user_id = ?', userId)!.n) >= MAX_CONNECTORS) throw badRequest(`You can connect up to ${MAX_CONNECTORS} apps. Remove one first.`);
+  const client = new McpClient(url, { authorization: `Bearer ${tokens.access_token}` }, services.mcpFetch);
+  const info = await client.initialize();
+  const tools = await client.listTools();
+  const existing = db.get('SELECT id FROM connectors WHERE user_id = ? AND url = ?', userId, url);
+  if (existing) {
+    // Signing in again replaces the tokens of the same app.
+    db.run("UPDATE connectors SET auth_secret = ?, auth_kind = 'oauth', last_error = NULL, updated_at = ? WHERE id = ?", encryptSecret(services.config.DATA_DIR, JSON.stringify(tokens)), nowIso(), existing.id);
+    return refreshConnector(services, userId, existing.id);
+  }
+  return saveConnector(services, userId, name, url, JSON.stringify(tokens), 'oauth', info, tools);
 }
 
 export async function refreshConnector(services: Services, userId: string, id: string) {
@@ -142,7 +180,7 @@ export async function refreshConnector(services: Services, userId: string, id: s
   if (!c) throw new HttpError(404, 'Connector not found', 'not_found');
   try {
     await checkConnectorUrl(c.url, services.config.MCP_ALLOW_PRIVATE_NETWORK === 'true');
-    const tools = await clientFor(services, c).listTools();
+    const tools = await (await clientFor(services, c)).listTools();
     db.run('UPDATE connectors SET tools = ?, last_error = NULL, last_checked_at = ?, updated_at = ? WHERE id = ?', JSON.stringify(cacheTools(c.slug, c.name, tools)), nowIso(), nowIso(), c.id);
   } catch (e: any) {
     const msg = e instanceof McpError ? e.message : 'Could not reach the connected app.';
@@ -171,6 +209,7 @@ export function updateConnector(services: Services, userId: string, id: string, 
   db.updateOwned('connectors', userId, id, {
     name: i.name, enabled: i.enabled === undefined ? undefined : i.enabled ? 1 : 0,
     auth_secret: i.token === undefined ? undefined : i.token ? encryptSecret(services.config.DATA_DIR, i.token) : null,
+    auth_kind: i.token === undefined ? undefined : i.token ? 'token' : null,
   });
   if (i.token === null) db.run('UPDATE connectors SET auth_secret = NULL WHERE id = ?', id);
   return presentConnector(db, userId, db.getOwned('connectors', userId, id)!);
@@ -213,7 +252,7 @@ export function findConnectorTool(db: Db, userId: string, key: string): { connec
 
 export async function callConnectorTool(services: Services, connector: Row, tool: CachedTool, args: Record<string, unknown>) {
   await checkConnectorUrl(connector.url, services.config.MCP_ALLOW_PRIVATE_NETWORK === 'true');
-  const r = await clientFor(services, connector).callTool(tool.name, args);
+  const r = await (await clientFor(services, connector)).callTool(tool.name, args);
   const text = resultText(r);
   if (r?.isError) throw new McpError(`${connector.name} reported a problem: ${text.slice(0, 600) || 'no details'}`);
   return { app: connector.name, tool: tool.name, untrusted_content: true, result: text || '(no content)' };
