@@ -6,6 +6,7 @@ import { resolve, relative } from 'node:path';
 import { ZodError } from 'zod';
 import type { AppEnv, Services } from './context.ts';
 import { HttpError } from './context.ts';
+import { verifyWebhook, signatureValid, queueWhatsApp } from './services/whatsapp.ts';
 import { ProviderError } from './ai/types.ts';
 import { securityHeaders, csrfGuard, requireAuth, rateLimit, clientIp, offlineReplay } from './middleware.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -36,6 +37,27 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
     // Never leak internals: log server-side, return a generic message.
     console.error('[error]', c.req.method, c.req.path, (err as Error)?.stack ?? err);
     return c.json({ error: 'Something went wrong on the server. Please try again.', code: 'internal' }, 500);
+  });
+
+  // WhatsApp Cloud API webhook: public, but every delivery must carry Meta's signature.
+  const hookLimit = rateLimit({ name: 'hooks', windowMs: 60_000, max: 300, key: clientIp });
+  app.get('/hooks/whatsapp/:id', hookLimit, (c) => {
+    const ch = services.db.get("SELECT * FROM channels WHERE id = ? AND kind = 'whatsapp'", c.req.param('id'));
+    const challenge = ch ? verifyWebhook(ch, c.req.query()) : null;
+    return challenge === null ? c.text('Forbidden', 403) : c.text(challenge);
+  });
+  app.post('/hooks/whatsapp/:id', hookLimit, bodyLimit({ maxSize: 1024 * 1024 }), async (c) => {
+    const ch = services.db.get("SELECT * FROM channels WHERE id = ? AND kind = 'whatsapp'", c.req.param('id'));
+    const raw = await c.req.text();
+    if (!ch || !signatureValid(services, ch, raw, c.req.header('x-hub-signature-256'))) return c.text('Forbidden', 403);
+    if (ch.enabled) {
+      try {
+        queueWhatsApp(services, ch, JSON.parse(raw));
+      } catch {
+        return c.text('Bad request', 400);
+      }
+    }
+    return c.text('OK');
   });
 
   // Shares normally go to the service worker; this only runs if it isn't installed yet.

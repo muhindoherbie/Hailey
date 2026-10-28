@@ -38,6 +38,17 @@ const schema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   GITHUB_API_URL: z.string().default('https://api.github.com'),
 
+  // Speech-to-text for voice notes sent through Telegram/WhatsApp: any OpenAI-compatible
+  // /audio/transcriptions endpoint. Free options: Groq (https://api.groq.com/openai/v1, free tier)
+  // or a local Whisper server such as speaches / faster-whisper-server.
+  TRANSCRIBE_BASE_URL: z.string().optional(),
+  TRANSCRIBE_API_KEY: z.string().optional(),
+  TRANSCRIBE_MODEL: z.string().default('whisper-large-v3-turbo'),
+
+  // Place search uses OpenStreetMap's free Nominatim service (max 1 request/second, fair use).
+  // Point this at your own Nominatim server for heavy use.
+  NOMINATIM_URL: z.string().default('https://nominatim.openstreetmap.org'),
+
   // Connected apps (MCP). Connectors on the server's own network (localhost, 192.168.x.x…) are
   // refused unless this is true — only turn it on if you run MCP servers on that network yourself.
   MCP_ALLOW_PRIVATE_NETWORK: z.enum(['true', 'false']).default('false'),

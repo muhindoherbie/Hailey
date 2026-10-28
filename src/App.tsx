@@ -21,6 +21,7 @@ const Routines = lazy(() => import('./pages/Routines'));
 const Ramble = lazy(() => import('./pages/Ramble'));
 const Share = lazy(() => import('./pages/Share'));
 const Connectors = lazy(() => import('./pages/Connectors'));
+const Messaging = lazy(() => import('./pages/Messaging'));
 
 function Router() {
   const { pathname } = useLocation();
@@ -48,6 +49,7 @@ function Router() {
     ['/ramble', () => <Ramble />],
     ['/share', () => <Share />],
     ['/connectors', () => <Connectors />],
+    ['/messaging', () => <Messaging />],
   ];
   for (const [pattern, render] of routes) {
     const params = match(pattern, pathname);

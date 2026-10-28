@@ -79,6 +79,7 @@ export function Shell({ title, actions, children, bare }: { title?: ReactNode; a
           <Icon name="bell" /> Notifications
           {counts.unread > 0 && <span className="count">{counts.unread}</span>}
         </Link>
+        <Link to="/messaging" className={`nav-item ${isActive('/messaging', pathname) ? 'active' : ''}`}><Icon name="send" /> Messaging</Link>
         <Link to="/connectors" className={`nav-item ${isActive('/connectors', pathname) ? 'active' : ''}`}><Icon name="link" /> Connected apps</Link>
         <Link to="/settings" className={`nav-item ${isActive('/settings', pathname) ? 'active' : ''}`}><Icon name="settings" /> Settings</Link>
         <div className="sidebar-footer">

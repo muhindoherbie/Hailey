@@ -11,6 +11,7 @@ import * as tasks from '../services/tasks.ts';
 import * as memory from '../services/memory.ts';
 import * as knowledge from '../services/knowledge.ts';
 import * as routines from '../services/routines.ts';
+import { findPlaces, PlacesError } from '../services/places.ts';
 
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 import { searchIndex, type Entity } from '../services/indexer.ts';
@@ -346,6 +347,49 @@ export const TOOLS: ToolDef[] = [
         moved.push(t.title);
       }
       return { moved };
+    },
+  }),
+  def({
+    name: 'find_places',
+    description: 'Find places (shops, pharmacies, restaurants, garages, hospitals, landmarks, addresses) using OpenStreetMap. Give what to look for and either a town/area in "near" or the user\'s shared coordinates. Returns names, addresses and map links; opening hours and ratings are not included.',
+    risk: 'read',
+    input: z.object({
+      query: z.string().min(2).max(200).describe('What to look for, e.g. "pharmacy" or "Garden City Mall"'),
+      near: z.string().max(200).optional().describe('Town, district or area, e.g. "Ntinda, Kampala"'),
+      lat: z.number().min(-90).max(90).optional(),
+      lon: z.number().min(-180).max(180).optional(),
+      limit: z.number().int().min(1).max(10).optional(),
+    }),
+    summarize: (i) => `Find places: ${i.query}${i.near ? ` near ${i.near}` : i.lat != null ? ' near your location' : ''}`,
+    run: async (i, ctx) => {
+      try {
+        const places = await findPlaces(ctx.services, i);
+        for (const p of places) ctx.sources.push({ title: p.name, url: p.osm_url, snippet: p.address });
+        return { places, note: places.length ? 'Data © OpenStreetMap contributors. Check opening hours before going.' : 'No matching places were found. Try a broader search or another area.' };
+      } catch (err) {
+        if (err instanceof PlacesError) throw new ToolError(err.message);
+        throw err;
+      }
+    },
+  }),
+  def({
+    name: 'prepare_call',
+    description: 'Save a phone-call plan as a note and return a tap-to-call link. Hailey cannot place calls itself: write the script (opening line, key points, questions, fallback if the answer is no) and the user makes the call.',
+    risk: 'reversible',
+    input: z.object({
+      who: z.string().min(1).max(120),
+      phone: z.string().max(40).optional().describe('Number to dial, if known'),
+      purpose: z.string().min(1).max(300),
+      script: z.string().min(10).max(5000).describe('The call script in Markdown'),
+    }),
+    summarize: (i) => `Prepare a call to ${i.who}`,
+    run: (i, ctx) => {
+      const digits = i.phone?.replace(/[^\d+]/g, '');
+      const note = knowledge.createNote(ctx.services.db, ctx.userId, {
+        title: `Call: ${i.who}`, tags: ['call'],
+        body: `**Purpose:** ${i.purpose}${digits ? `\n**Number:** [${i.phone}](tel:${digits})` : ''}\n\n${i.script}`,
+      });
+      return { note_id: note.id, dial_url: digits ? `tel:${digits}` : undefined, note: 'Saved as a note. The user places the call themselves.' };
     },
   }),
   def({

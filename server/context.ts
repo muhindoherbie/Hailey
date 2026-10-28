@@ -14,6 +14,8 @@ export interface Services {
   now: () => Date;
   /** Fetch used for connected apps (MCP); tests may replace it. */
   mcpFetch?: typeof fetch;
+  /** Fetch used for other outbound services (place search, messaging channels); tests may replace it. */
+  netFetch?: typeof fetch;
 }
 
 export interface SessionUser {
