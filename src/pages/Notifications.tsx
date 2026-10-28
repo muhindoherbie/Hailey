@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { Shell } from '../components/Shell';
 import { Icon } from '../components/Icon';
-import { Empty, ErrorBox, Loading } from '../components/ui';
+import { Empty, ErrorBox, Loading, useConfirm } from '../components/ui';
 import { useData } from '../lib/hooks';
-import { post } from '../lib/api';
+import { del, post } from '../lib/api';
 import { navigate } from '../lib/router';
 import { relative } from '../lib/format';
 import { useSession } from '../lib/session';
@@ -13,6 +13,7 @@ const ICON: Record<string, string> = { reminder: 'bell', action_failed: 'alert',
 export default function Notifications() {
   const { refreshCounts } = useSession();
   const { data, error, loading, reload } = useData<any>('/notifications');
+  const confirm = useConfirm();
   useEffect(() => {
     if (data?.unread) {
       const t = setTimeout(() => post('/notifications/read', {}).then(refreshCounts), 1500);
@@ -20,7 +21,14 @@ export default function Notifications() {
     }
   }, [data?.unread, refreshCounts]);
   return (
-    <Shell title="Notifications">
+    <Shell title="Notifications" actions={data?.notifications.length > 0 && (
+      <button className="btn ghost sm" onClick={async () => {
+        if (!(await confirm({ title: 'Clear all notifications?', body: 'This permanently deletes every notification in your inbox. Reminders and routines keep working.', confirm: 'Clear all', danger: true }))) return;
+        await del('/notifications');
+        reload();
+        refreshCounts();
+      }}><Icon name="trash" size={15} />Clear all</button>
+    )}>
       <div className="page narrow">
         <ErrorBox error={error} retry={reload} />
         {loading && !data ? <Loading /> : data?.notifications.length === 0 ? (

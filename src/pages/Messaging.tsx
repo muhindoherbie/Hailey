@@ -162,7 +162,7 @@ function WhatsAppCard({ ch, reload, publicUrl }: { ch: any; reload: () => void; 
   return (
     <section className="card pad stack">
       <h2>WhatsApp <span className="badge">free for chats you start</span></h2>
-      {local && <div className="callout warning small"><Icon name="info" size={16} />WhatsApp needs Hailey on a public HTTPS address (set <code>PUBLIC_URL</code>, e.g. your ngrok or Cloudflare Tunnel address). Telegram above works without one.</div>}
+      {local && <div className="callout warning small"><Icon name="info" size={16} /><span>WhatsApp needs Hailey on a public HTTPS address (set <code>PUBLIC_URL</code>, e.g. your ngrok or Cloudflare Tunnel address). Telegram above works without one.</span></div>}
       <ol className="small" style={{ paddingLeft: 18 }}>
         <li>At <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer">developers.facebook.com</a>, create an app of type <i>Business</i> and add the <b>WhatsApp</b> product. Meta gives you a free test number, or add your own business number.</li>
         <li>Copy the <b>Phone number ID</b> and create a <b>permanent access token</b> (Business settings → System users) with <i>whatsapp_business_messaging</i>. Copy the <b>App secret</b> from App settings → Basic.</li>

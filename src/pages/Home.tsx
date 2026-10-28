@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { Shell } from '../components/Shell';
 import { Icon } from '../components/Icon';
 import { TaskItem } from '../components/TaskItem';
+import { Avatar } from '../components/Avatar';
 import { Empty, ErrorBox, Loading, Modal, StaleNote, Switch, useToast } from '../components/ui';
 import { useData } from '../lib/hooks';
 import { useSession } from '../lib/session';
@@ -13,13 +14,17 @@ import { useDictation } from '../lib/voice';
 const WIDGET_NAMES: Record<string, string> = {
   briefing: 'Daily briefing', today: 'Today’s tasks', upcoming: 'Upcoming deadlines & reminders', projects: 'Active projects',
   quick: 'Quick actions', recent: 'Recent conversations & work', review: 'Completed & outstanding', suggestions: 'Suggestions',
+  week: 'Your week in numbers', discover: 'Ideas to try',
 };
 
 export function Home() {
   const { me, saveSettings } = useSession();
   const { data, error, loading, stale, reload } = useData<any>('/dashboard', { cache: true });
   const [customize, setCustomize] = useState(false);
-  const widgets: { id: string; visible: boolean }[] = me!.settings.dashboard.widgets;
+  // Widgets added in later versions appear for everyone, after the ones they already arranged.
+  const saved: { id: string; visible: boolean }[] = me!.settings.dashboard.widgets;
+  const widgets = [...saved, ...Object.keys(WIDGET_NAMES).filter((id) => !saved.some((w) => w.id === id)).map((id) => ({ id, visible: true }))];
+  const discover = useData<any>('/discover');
   const name = me!.settings.profile.displayName || me!.user.name;
 
   const hour = data?.hour ?? new Date().getHours();
@@ -128,6 +133,28 @@ export function Home() {
         )}
       </Widget>
     ),
+    week: () => data?.week && (
+      <Widget title="Your week in numbers" icon="chart">
+        <div className="grid two" style={{ gap: 10 }}>
+          <Stat n={data.week.tasksCompleted} label="tasks done" />
+          <Stat n={data.week.tasksAdded} label="tasks added" />
+          <Stat n={data.week.remindersSent} label="reminders sent" />
+          <Stat n={data.week.notesSaved + data.week.routineRuns} label="notes & routine runs" />
+        </div>
+        {data.streak > 1 && <p className="small" style={{ marginTop: 10 }}>🔥 {data.streak} weeks in a row with {me!.settings.profile.assistantName || 'Hailey'}. <Link to="/settings#profile">See what you’ve unlocked</Link></p>}
+      </Widget>
+    ),
+    discover: () => discover.data?.cards?.length > 0 && (
+      <Widget title="Ideas to try" icon="sparkle" link={{ to: '/discover', label: 'See all' }}>
+        <ul className="list">
+          {discover.data.cards.slice(0, 4).map((c: any) => (
+            <li key={c.id} className="list-item clickable" onClick={() => navigate(c.action === 'chat' ? `/chat/new?q=${encodeURIComponent(c.prompt)}` : c.action === 'routine' ? `/routines?idea=${c.routine}` : c.action === 'ramble' ? '/ramble' : c.action === 'voice' ? '/chat/new?voice=1' : c.id === 'group' ? '/messaging' : '/connectors')}>
+              <Icon name={c.icon} size={16} /><div className="grow"><div className="small" style={{ fontWeight: 600 }}>{c.title}</div><div className="tiny muted">{c.blurb}</div></div>
+            </li>
+          ))}
+        </ul>
+      </Widget>
+    ),
     suggestions: () => data && data.suggestions.length > 0 && (
       <Widget title="Suggestions" icon="sparkle">
         <ul className="list">
@@ -149,7 +176,10 @@ export function Home() {
     <Shell title="Home" actions={<button className="btn ghost sm" onClick={() => setCustomize(true)}><Icon name="settings" size={16} /><span className="desktop-only">Customise</span></button>}>
       <div className="page">
         <div className="hero">
-          <div className="greet">{greet}, {name.split(' ')[0]}</div>
+          <div className="row" style={{ gap: 14 }}>
+            <Link to="/chat/new?voice=1" aria-label={`Talk to ${me!.settings.profile.assistantName || 'Hailey'}`} title="Talk hands-free"><Avatar size={52} /></Link>
+            <div className="greet">{greet}, {name.split(' ')[0]}</div>
+          </div>
           <div className="date">{now}</div>
           <AskBar />
         </div>
@@ -231,7 +261,7 @@ function AskBar() {
       <form className="ask" onSubmit={submit} role="search">
         <Icon name="sparkle" style={{ color: 'var(--brand)' }} />
         <label htmlFor="ask" className="sr-only">Ask Hailey</label>
-        <input id="ask" data-composer placeholder={voice.listening ? 'Listening…' : 'Ask Hailey anything, or tell her what to do…'} value={voice.interim ? `${q} ${voice.interim}` : q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+        <input id="ask" data-composer placeholder={voice.listening ? 'Listening…' : `Ask ${me!.settings.profile.assistantName || 'Hailey'} anything, or say what to do…`} value={voice.interim ? `${q} ${voice.interim}` : q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
         {me!.settings.voice.enabled && voice.supported && (
           <button type="button" className={`btn ghost icon ${voice.listening ? 'recording' : ''}`} onClick={voice.listening ? voice.stop : voice.start} aria-label={voice.listening ? 'Stop recording' : 'Speak'} aria-pressed={voice.listening}>
             <Icon name={voice.listening ? 'stop' : 'mic'} />

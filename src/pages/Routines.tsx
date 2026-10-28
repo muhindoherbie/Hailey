@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Shell } from '../components/Shell';
 import { Icon } from '../components/Icon';
 import { Empty, ErrorBox, Loading, Markdown, Modal, Switch, useConfirm, useToast } from '../components/ui';
 import { useData } from '../lib/hooks';
 import { del, patch, post } from '../lib/api';
-import { Link } from '../lib/router';
+import { Link, useLocation } from '../lib/router';
 import { fmtDateTime } from '../lib/format';
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -34,6 +34,12 @@ export default function Routines() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [category, setCategory] = useState('All');
   const [running, setRunning] = useState<string | null>(null);
+  const { query } = useLocation();
+  const wanted = query.get('idea');
+  useEffect(() => {
+    const i = wanted && ideas.data?.ideas.find((x: any) => x.id === wanted);
+    if (i) setDraft({ title: i.title, prompt: i.prompt, time_local: i.time, days: i.days, catalog_id: i.id, needs: i.needs });
+  }, [wanted, ideas.data]);
 
   const list: any[] = data?.routines ?? [];
   const used = new Set(list.map((r) => r.catalog_id).filter(Boolean));

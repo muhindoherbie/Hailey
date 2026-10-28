@@ -119,6 +119,12 @@ export const ROUTINE_IDEAS: RoutineIdea[] = [
     time: '07:00', days: EVERY_DAY, needs: ['web_search'],
   },
   {
+    id: 'ai-brief', category: 'Connected apps', icon: 'sun', title: 'One clear daily brief',
+    blurb: 'Tasks, calendar, email and messages from your connected apps, in one summary.',
+    prompt: 'Give me one clear brief for today. Use my tasks, reminders and projects, and — if I have connected apps — today\'s calendar, emails waiting on me and important messages. Lead with the three things that matter most, then anything I need to reply to, then the rest in short bullets. Skip anything that doesn\'t need me.',
+    time: '07:15', days: [1, 2, 3, 4, 5, 6, 0], needs: ['connector'],
+  },
+  {
     id: 'email-triage', category: 'Connected apps', icon: 'send', title: 'Email needing a reply',
     blurb: 'Uses your connected email app to list what is waiting on you.',
     prompt: 'Using my connected email app, find emails from the last day that ask me a direct question or are waiting on my reply. List them with the sender and a one-line summary. Skip newsletters. Do not send or draft anything.',

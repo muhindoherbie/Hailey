@@ -340,6 +340,7 @@ export function dataRoutes() {
     notifications: db(c).all('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100', uid(c)),
     unread: Number(db(c).get('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read = 0', uid(c))!.n),
   }));
+  r.delete('/notifications', (c) => c.json({ deleted: Number(db(c).run('DELETE FROM notifications WHERE user_id = ?', uid(c)).changes) }));
   r.post('/notifications/read', async (c) => {
     const { ids } = z.object({ ids: z.array(z.string().max(64)).max(500).optional() }).parse(await body(c));
     if (ids?.length) for (const id of ids) db(c).run('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?', id, uid(c));

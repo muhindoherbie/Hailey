@@ -52,6 +52,8 @@ export default defineConfig({
           { name: 'New chat', url: '/chat/new', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
           { name: 'Tasks', url: '/tasks', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
           { name: 'Ramble it out', url: '/ramble', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Talk to Hailey', url: '/chat/new?voice=1', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Discover', url: '/discover', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
         ],
       },
       devOptions: { enabled: false },

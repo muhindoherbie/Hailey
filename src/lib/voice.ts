@@ -109,6 +109,22 @@ export function speak(text: string, opts: { lang?: string; voiceName?: string } 
   return true;
 }
 
+/** Speaks and resolves when finished (or immediately when speech isn't available). */
+export function speakAsync(text: string, opts: { lang?: string; voiceName?: string } = {}) {
+  return new Promise<void>((resolve) => {
+    if (!('speechSynthesis' in window)) return resolve();
+    if (!speak(text, opts)) return resolve();
+    // speak() queued exactly one utterance; poll for the end, since onend is unreliable on some browsers.
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if ((!window.speechSynthesis.speaking && Date.now() - started > 300) || Date.now() - started > 120_000) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 200);
+  });
+}
+
 export function stopSpeaking() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }

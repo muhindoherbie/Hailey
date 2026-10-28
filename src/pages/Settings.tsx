@@ -103,9 +103,17 @@ function Profile() {
   const s = me!.settings.profile;
   const [name, setName] = useState(s.displayName);
   const [instr, setInstr] = useState(s.customInstructions);
+  const [aname, setAname] = useState(s.assistantName || 'Hailey');
+  const [lang, setLang] = useState(s.replyLanguage || '');
   return (
+    <>
     <Card title="Profile & assistant" desc="How Hailey addresses you and how she responds. Changes apply to new conversations.">
       <Row label="Your name"><input className="input" style={{ width: 240 }} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== s.displayName && save({ profile: { displayName: name } })} aria-label="Display name" /></Row>
+      <Row label="Assistant’s name" desc="Give your assistant any name you like."><input className="input" style={{ width: 240 }} maxLength={40} value={aname} onChange={(e) => setAname(e.target.value)} onBlur={() => aname.trim() && aname !== s.assistantName && save({ profile: { assistantName: aname.trim() } })} aria-label="Assistant name" /></Row>
+      <Row label="Reply language" desc="Leave empty to reply in whatever language you write in.">
+        <input className="input" style={{ width: 240 }} list="langs" maxLength={40} placeholder="Match my language" value={lang} onChange={(e) => setLang(e.target.value)} onBlur={() => lang !== s.replyLanguage && save({ profile: { replyLanguage: lang.trim() } })} aria-label="Reply language" />
+        <datalist id="langs">{['English', 'Luganda', 'Swahili', 'Kinyarwanda', 'French', 'Spanish', 'Portuguese', 'German', 'Dutch', 'Italian', 'Arabic', 'Hindi'].map((l) => <option key={l} value={l} />)}</datalist>
+      </Row>
       <Row label="Response style">
         <Seg label="Response style" value={s.assistantStyle} onChange={(v) => save({ profile: { assistantStyle: v } })} options={[{ value: 'balanced', label: 'Balanced' }, { value: 'concise', label: 'Concise' }, { value: 'detailed', label: 'Detailed' }, { value: 'warm', label: 'Warm' }]} />
       </Row>
@@ -114,6 +122,60 @@ function Profile() {
         <textarea id="ci" className="textarea" maxLength={2000} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="e.g. I run a community pharmacy in Kampala. Use UGX for money. Keep plans practical." />
         <div className="row"><span className="hint grow">{instr.length}/2000</span><button className="btn sm primary" disabled={instr === s.customInstructions} onClick={() => save({ profile: { customInstructions: instr } })}>Save instructions</button></div>
       </div>
+    </Card>
+    <WritingStyle />
+    <Modes />
+    </>
+  );
+}
+
+/** Learns how the user writes so drafts sound like them. */
+function WritingStyle() {
+  const { me, refresh } = useSession();
+  const toast = useToast();
+  const [samples, setSamples] = useState('');
+  const [busy, setBusy] = useState(false);
+  const style = me!.settings.profile.writingStyle;
+  return (
+    <Card title="Your writing style" desc="Paste a few messages or emails you wrote. Hailey learns your tone so drafts sound like you. Samples aren’t stored — only the style notes below.">
+      {style && <pre className="small" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--surface-2)', padding: 10, borderRadius: 8 }}>{style}</pre>}
+      <textarea className="textarea" rows={5} maxLength={12000} value={samples} onChange={(e) => setSamples(e.target.value)} placeholder="Paste two or three things you’ve written…" aria-label="Writing samples" />
+      <div className="row" style={{ marginTop: 8 }}>
+        <span className="grow" />
+        {style && <button className="btn ghost sm" onClick={async () => { await patch('/settings', { profile: { writingStyle: '' } }); await refresh(); }}>Forget my style</button>}
+        <button className="btn sm primary" disabled={busy || samples.trim().length < 80} onClick={async () => {
+          setBusy(true);
+          try {
+            await post('/profile/writing-style', { samples });
+            setSamples('');
+            await refresh();
+            toast('Writing style learned');
+          } catch (e: any) {
+            toast(e.message, 'error');
+          } finally {
+            setBusy(false);
+          }
+        }}>{busy ? 'Learning…' : style ? 'Learn again' : 'Learn my style'}</button>
+      </div>
+    </Card>
+  );
+}
+
+/** Specialist modes, unlocked by using Hailey. */
+function Modes() {
+  const { me } = useSession();
+  const save = useSave();
+  const a = useData<any>('/achievements');
+  const current = me!.settings.profile.persona;
+  return (
+    <Card title="Specialist modes" desc={a.data ? `Unlock a mode by using Hailey. You’ve opened Hailey ${a.data.weeksVisited} week${a.data.weeksVisited === 1 ? '' : 's'}${a.data.streak > 1 ? ` (${a.data.streak} in a row)` : ''}.` : 'Unlock a mode by using Hailey.'}>
+      <Row label="Standard" desc="Hailey’s everyday all-rounder."><input type="radio" name="persona" checked={current === 'none'} onChange={() => save({ profile: { persona: 'none' } })} aria-label="Standard mode" /></Row>
+      {a.data?.personas.map((p: any) => (
+        <Row key={p.id} label={p.name} desc={<>{p.blurb}{!p.unlocked && <> · <b>{p.requirement}</b> ({p.progress}/{p.goal})</>}</>}>
+          {p.unlocked ? <input type="radio" name="persona" checked={current === p.id} onChange={() => save({ profile: { persona: p.id } })} aria-label={p.name} />
+            : <span className="progress" style={{ width: 90, display: 'inline-block' }} role="progressbar" aria-valuenow={p.progress} aria-valuemax={p.goal}><span style={{ width: `${(p.progress / p.goal) * 100}%` }} /></span>}
+        </Row>
+      ))}
     </Card>
   );
 }
