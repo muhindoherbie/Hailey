@@ -12,15 +12,21 @@ It is an installable web app (PWA) for Windows and Android browsers, backed by a
 | Area | What works |
 |---|---|
 | **Home** | Greeting, local date/time, AI prompt with voice input, today's and overdue tasks, upcoming deadlines and reminders, active projects, quick actions, recent chats and work, a daily briefing and suggestions built **only from your saved data**. Widgets can be hidden and reordered. |
-| **Chat** | Streaming replies with Markdown, code and tables; persistent history; search, rename, archive, delete; cancel and retry; file and photo attachments (photos are shown to models that can see images); copy, read aloud, save as note; export chats to Markdown, Word or PDF; summarise a chat into memory. Shows which AI model answered each reply and, with automatic model choice on, why. |
+| **Chat** | Streaming replies with Markdown, code and tables; persistent history; search, rename, archive, delete; cancel and retry; file, photo and video attachments (photos and still frames from videos are shown to models that can see images); rate replies 👍 👎; copy, read aloud, save as note; export chats to Markdown, Word or PDF; summarise a chat into memory. Shows which AI model answered each reply and, with automatic model choice on, why. |
 | **Tool-using agent** | 34 typed, validated tools: tasks, reminders, notes, projects and plans, routines, memory, knowledge search, document reading, spreadsheet analysis, web research, workload checks, read-only GitHub summaries, file exports — plus the tools of any apps you connect. Every action is logged. **Deletions always wait for your approval**, and each approval is bound to the exact action and expires after 7 days; you can set any tool to *Allowed*, *Ask me first* or *Off*. |
 | **Memory** | Long-term memory kept separate from chat history. Sensitive or inferred memories wait for your approval. View, edit, export, delete, clear by category, retention period, and a per-answer "used these memories" note. |
 | **Tasks** | Priorities, due dates, subtasks, tags, categories, projects, recurrence, estimates, history; Today / Upcoming / Overdue / No date / Completed / Calendar views; natural-language quick add ("remind me tomorrow morning…") that **shows how it read the date and asks you to confirm**; carry overdue tasks forward; task dependencies; warnings for overloaded days and for tasks due before what they depend on. |
 | **Reminders** | Scheduled on the server and delivered by web push even when the app is closed; quiet hours; retries; in-app notification centre. Morning briefing and evening review routines (the review covers what you finished, what is still open, project progress and suggested priorities for tomorrow), each showing its last run result. |
-| **Routines** | Your own scheduled instructions that Hailey carries out on the server at a set time and days — “every Friday at 16:30 log my wins”, “daily at 9 check this price”, “weekday mornings teach me one Luganda word”. Pick from 17 ready-made ideas or write your own, or just ask in chat. Each routine keeps its own chat so it builds on earlier runs; results arrive as a notification; anything that needs approval waits for you. Run now, edit, pause or delete any time. |
+| **Routines** | Your own scheduled instructions that Hailey carries out on the server at a set time and days — “every Friday at 16:30 log my wins”, “daily at 9 check this price”, “weekday mornings teach me one Luganda word”. Pick from 18 ready-made ideas or write your own, or just ask in chat. Each routine keeps its own chat so it builds on earlier runs; results arrive as a notification; anything that needs approval waits for you. Run now, edit, pause or delete any time. |
+| **Voice mode** | A hands-free conversation in any chat: Hailey listens, answers out loud and listens again, with an animated face that shows when it's listening, thinking and talking. Uses your browser's speech service, so it's free. |
+| **Messaging (Telegram & WhatsApp)** | Chat with Hailey from **Telegram** (free; your own bot, no public address needed) or **WhatsApp** (Business Cloud API, free for conversations you start). Text, voice notes (transcribed with a free or local speech-to-text service) and photos; Approve/Decline buttons for actions. Add Hailey to a Telegram group — it answers only when mentioned, can't see your private data there, and `/stop` mutes it. |
+| **Discover** | 35 ready-made things to ask for — goals, meal plans, budgets and unused subscriptions, invoices, bedtime stories, home repairs, call prep, places nearby, trips — ordered by what you said you want help with. |
+| **Make it yours** | First-run setup; rename your assistant; reply language; Hailey learns your writing style from samples; Chef, Coach and Tutor modes unlocked through use; weekly streak and *Your week in numbers*. |
 | **Ramble it out** | Talk (continuous voice input, pauses are fine) or type everything on your mind; Hailey sorts it into tasks, reminders and notes and reads each date with the same parser as quick add. You untick, edit and confirm before anything is added. |
-| **Connected apps** | Connect email, calendar, notes, project and thousands of other apps through **MCP**, either directly or via a connector service (Zapier MCP, Composio, Pipedream…). Read-only tools run freely; sending, changing and deleting ask first unless you allow a tool; destructive tools always ask. |
-| **Share to Hailey** | Once installed, Hailey appears in Android's (and desktop Chrome/Edge's) Share menu: share a link, text, photo or document and choose *Ask Hailey*, *Save as note*, *Add as task* or *Save files*. |
+| **Connected apps** | Connect email, calendar, notes, project and thousands of other apps through **MCP**: sign in directly with apps that support it (e.g. Notion, Linear), paste a token, or use a connector service (Zapier MCP, Composio, Pipedream…). Read-only tools run freely; sending, changing and deleting ask first unless you allow a tool; destructive tools always ask. |
+| **Share to Hailey** | Once installed, Hailey appears in Android's (and desktop Chrome/Edge's) Share menu: share a link, text, photo or document and choose *Ask Hailey*, *Save as note*, *Add as task* or *Save files*. Replies can be shared to WhatsApp or anywhere through your phone's share sheet. |
+| **Out and about** | Find places with OpenStreetMap (free) and add your current location to a message; prepare a phone call as a short script with a tap-to-dial link (Hailey doesn't place calls). |
+| **Android extras** | A home-screen widget (Ramble, Talk, New chat) and app shortcuts. |
 | **Projects & workspaces** | Five starter workspaces (Personal, Pharmacy & business, Education & research, Software, General); projects with goals, milestones, decisions, risks, blockers, tasks, notes, documents, activity and progress; "Continue with Hailey" resumes a project with its context. |
 | **Knowledge centre** | Markdown notes with folders, tags, pinning and links to tasks/projects/documents; uploads of **PDF (text-based), DOCX, TXT, MD, CSV, XLSX and photos (JPG, PNG, WebP, GIF — shrunk on your device to fit 5 MB)**; full-text search with page/section references; AI summaries and key points. |
 | **Data analysis** | CSV/XLSX profiling: totals, means, medians, missing values, rankings, monthly trends, outliers, charts; downloadable reports (Word, PDF, Excel, Markdown). Calculations are done by code, and the method is explained. |
@@ -37,7 +43,9 @@ It is an installable web app (PWA) for Windows and Android browsers, backed by a
 - Hailey has no email or calendar of its own. To work with Gmail, Outlook, Google Calendar and similar, add them as **connected apps** (see below); apps that need a browser sign-in pop-up (OAuth) have to go through a connector service. Without them, Hailey offers a **read-only calendar feed** of your tasks.
 - Looking at photos needs a model that can see images: Claude can; for an OpenAI-compatible or local model, choose one with vision and set `OPENAI_COMPAT_VISION=true`.
 - Each custom routine run and each Ramble is an AI request and counts towards your usage and limits.
-- Hailey does not make phone calls or message on WhatsApp for you.
+- Hailey does not place phone calls (that needs a paid phone service); it prepares the call for you instead. It only replies on WhatsApp — it never starts conversations, which Meta charges for.
+- Voice mode and dictation need a browser with speech recognition (Chrome or Edge). Voice notes in Telegram/WhatsApp need `TRANSCRIBE_BASE_URL` set.
+- The interface is in English; Hailey's replies follow your language or the reply language you choose.
 - Push notifications on Windows arrive only while the browser is allowed to run in the background. On Android, install Hailey to the home screen for the most reliable delivery.
 - Voice input uses your browser's speech service (Google in Chrome, Microsoft in Edge), so audio is processed by that company.
 
@@ -137,8 +145,24 @@ Without either, Research tells you it is unavailable — Hailey never pretends t
 
 ---
 
+## Messaging: Telegram and WhatsApp (optional)
+Open **Messaging** in the sidebar.
+
+- **Telegram (free, easiest):** in Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`, and paste the token it gives you. Hailey shows a 6-digit code; send it to your new bot. For a group, add the bot and send `/link CODE` in the group. Hailey polls Telegram, so this works on a home PC with no public address.
+- **WhatsApp:** create a Meta developer app with the WhatsApp product, then paste the phone number ID, a permanent access token and the app secret. Copy the webhook address and verify token Hailey shows into Meta's WhatsApp configuration (subscribe to *messages*). This needs Hailey on a public HTTPS address (`PUBLIC_URL`, e.g. your ngrok or Cloudflare Tunnel address). Conversations you start are free; Hailey never starts paid ones.
+- **Voice notes:** set a speech-to-text service in `.env`. Free options:
+  ```
+  # Groq (free tier): create a key at console.groq.com
+  TRANSCRIBE_BASE_URL=https://api.groq.com/openai/v1
+  TRANSCRIBE_API_KEY=gsk_...
+  TRANSCRIBE_MODEL=whisper-large-v3-turbo
+  ```
+  or a local Whisper server (for example *speaches*) at `TRANSCRIBE_BASE_URL=http://localhost:8000/v1`.
+
+---
+
 ## Connected apps (optional)
-Open **Connected apps** in the sidebar, choose **Connect an app**, and paste an MCP server address (and an access token if the app gave you one). Hailey checks it, lists the app's tools, and from then on can use them in chat and in routines.
+Open **Connected apps** in the sidebar, choose **Connect an app**, and paste an MCP server address. Then either **Sign in with the app** (for apps that support it, such as Notion or Linear — Hailey opens the app's own sign-in page; `PUBLIC_URL` must be the address you open Hailey at) or paste an access token. Hailey checks it, lists the app's tools, and from then on can use them in chat and in routines.
 
 - **Easiest route to Gmail, Google Calendar, Outlook, Slack, Notion, Todoist and more:** a connector service such as Zapier MCP, Composio or Pipedream. Sign in there, choose the apps and actions to allow, and copy your personal MCP address. Treat that address like a password.
 - **Apps with their own MCP server** (GitHub, Linear, Atlassian, many others) publish an address and explain how to make a token. Use the *Streamable HTTP* address — it often ends in `/mcp`. Older SSE-only servers are not supported.
@@ -255,7 +279,8 @@ server/
   ai/           Provider interface; Claude adapter (official SDK); OpenAI-compatible adapter; agent loop
   tools/        Tool registry: typed schemas (zod), risk levels, permission policy, approval queue
   services/     tasks, memory, knowledge, documents, spreadsheets, exporters, search, push, scheduler, briefing,
-                routines, ramble, connectors + mcp (MCP client), secrets, time
+                routines, ramble, connectors + mcp + mcp-oauth, channels + telegram + whatsapp, transcribe,
+                places, achievements, discover, secrets, time
   db/           node:sqlite wrapper and SQL migrations (FTS5 full-text search)
 tests/          Vitest suites with a scripted fake AI provider
 scripts/        setup, backup, restore, icon generator, dev runner
