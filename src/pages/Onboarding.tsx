@@ -6,6 +6,8 @@ import { patch, post } from '../lib/api';
 import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
 import { useData } from '../lib/hooks';
+import { MOBILE } from '../lib/device';
+import { DeviceAI } from '../components/DeviceAI';
 
 const NAMES = ['Hailey', 'Nia', 'Amara', 'Zuri', 'Kito', 'Sage', 'Nova', 'Juno', 'Ada', 'Leo', 'Imani', 'Tendo', 'Ayo', 'Mira', 'Kai', 'Wren'];
 const INTERESTS: [string, string, string][] = [
@@ -26,7 +28,8 @@ export default function Onboarding() {
   const ideas = useData<any>('/routines/ideas');
   const builtIns = useData<any>('/routines');
   const [step, setStep] = useState(0);
-  const [you, setYou] = useState(me!.settings.profile.displayName || me!.user.name);
+  // The phone app's account starts as “Friend”; ask for a real name instead of suggesting that.
+  const [you, setYou] = useState(MOBILE && !me!.settings.profile.displayName ? '' : me!.settings.profile.displayName || me!.user.name);
   const [assistant, setAssistant] = useState(me!.settings.profile.assistantName || 'Hailey');
   const [interests, setInterests] = useState<string[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set(['morning_briefing']));
@@ -80,6 +83,13 @@ export default function Onboarding() {
         <button className="btn ghost sm" onClick={() => setSuggestions([...NAMES].sort(() => Math.random() - 0.5).slice(0, 6))}><Icon name="refresh" size={14} />More names</button>
       </div>
     </div>,
+    ...(MOBILE ? [
+      <div key="ai" className="stack">
+        <h1>Give {assistant.trim() || 'me'} a brain</h1>
+        <p className="muted">I live on your phone, and I use an AI service to think. Groq and Google Gemini are free — pick one, get a key in a minute, and paste it here. You can do this later in Settings.</p>
+        <DeviceAI compact onSaved={() => setStep((x) => x + 1)} />
+      </div>,
+    ] : []),
     <div key="help" className="stack">
       <h1>What would you like help with, {you.split(' ')[0] || 'friend'}?</h1>
       <p className="muted">Choose a few. I’ll suggest the right ideas first.</p>

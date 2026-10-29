@@ -16,6 +16,8 @@ export interface Services {
   mcpFetch?: typeof fetch;
   /** Fetch used for other outbound services (place search, messaging channels); tests may replace it. */
   netFetch?: typeof fetch;
+  /** Phone app only: holds the session token, since in-app API calls carry no cookies. */
+  deviceSession?: { get(): string | undefined; set(token: string | null): void };
 }
 
 export interface SessionUser {

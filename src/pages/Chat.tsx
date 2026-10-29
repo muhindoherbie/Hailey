@@ -13,6 +13,7 @@ import { IMAGE_ACCEPT } from '../lib/images';
 import { VoiceMode } from '../components/VoiceMode';
 import { Avatar } from '../components/Avatar';
 import { useMascot } from '../lib/mascot';
+import { ApiImg } from '../components/ApiFile';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; meta: any; created_at: string; pending?: boolean };
 type ToolEv = { id: string; name: string; status: string; summary?: string; error?: string; actionId?: string; result?: any };
@@ -387,7 +388,7 @@ function MessageView({ m }: { m: Msg }) {
         <div className="bubble" style={{ opacity: m.pending ? 0.7 : 1 }}>
           {m.meta?.attachments?.length > 0 && (
             <div>{m.meta.attachments.map((a: any) => a.kind === 'image'
-              ? <a key={a.id} href={`/knowledge/documents/${a.id}`} className="attach-thumb"><img src={`/api/documents/${a.id}/preview`} alt={a.filename ?? 'Attached image'} loading="lazy" /></a>
+              ? <a key={a.id} href={`/knowledge/documents/${a.id}`} className="attach-thumb"><ApiImg src={`/api/documents/${a.id}/preview`} alt={a.filename ?? 'Attached image'} loading="lazy" /></a>
               : <span key={a.id} className="attach-chip"><Icon name="paperclip" size={12} />{a.filename ?? 'Attachment'}</span>)}</div>
           )}
           {m.content}
@@ -538,7 +539,7 @@ function Composer({ onSend, busy, onCancel, disabled, onVoice }: { onSend: (text
         {files.length > 0 && (
           <div style={{ padding: '4px 6px 0' }}>
             {files.map((f) => (
-              <span key={f.id} className="attach-chip">{f.kind === 'image' ? <img className="chip-thumb" src={`/api/documents/${f.id}/preview`} alt="" /> : <Icon name="paperclip" size={12} />}{f.filename}
+              <span key={f.id} className="attach-chip">{f.kind === 'image' ? <ApiImg className="chip-thumb" src={`/api/documents/${f.id}/preview`} alt="" /> : <Icon name="paperclip" size={12} />}{f.filename}
                 <button className="btn ghost icon sm" style={{ width: 20, height: 20 }} onClick={() => setFiles(files.filter((x) => x.id !== f.id))} aria-label={`Remove ${f.filename}`}><Icon name="x" size={12} /></button>
               </span>
             ))}

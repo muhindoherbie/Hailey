@@ -20,7 +20,8 @@ export class AnthropicProvider implements AIProvider {
   private effort: Effort;
 
   constructor(opts: { apiKey?: string; model: string; effort?: Effort }) {
-    this.client = opts.apiKey ? new Anthropic({ apiKey: opts.apiKey, maxRetries: 2 }) : null;
+    // The phone app runs this code inside the app itself (mobile/engine.ts), with the user's own key.
+    this.client = opts.apiKey ? new Anthropic({ apiKey: opts.apiKey, maxRetries: 2, dangerouslyAllowBrowser: typeof window !== 'undefined' }) : null;
     this.model = opts.model;
     this.effort = opts.effort ?? 'medium';
   }

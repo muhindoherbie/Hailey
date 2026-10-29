@@ -8,6 +8,9 @@ import { useSession } from '../lib/session';
 import { fmtDateTime } from '../lib/format';
 import { speak } from '../lib/voice';
 import { Link } from '../lib/router';
+import { ApiDownload } from '../components/ApiFile';
+import { DeviceAI } from '../components/DeviceAI';
+import { MOBILE } from '../lib/device';
 
 const SECTIONS = [
   ['profile', 'Profile & assistant', 'user'],
@@ -205,6 +208,11 @@ function AI() {
   const u = usage.data;
   return (
     <>
+      {MOBILE ? (
+        <Card title="AI service" desc="Hailey runs on this phone and asks an AI service to write its replies. Groq, Gemini and OpenRouter have free tiers — pick one and paste its key.">
+          <DeviceAI />
+        </Card>
+      ) : (
       <Card title="AI provider" desc="API keys live only on the server (.env) — never in the browser or in GitHub. Hailey can use Claude or any OpenAI-compatible endpoint, including a free local model with Ollama.">
         {providers.map((p) => (
           <Row key={p.id} label={p.label} desc={<>{p.configured ? <>Model: <code>{p.model}</code>{p.capabilities.local ? ' · runs locally (free)' : ''}{p.pricing ? ` · ~$${p.pricing.input}/$${p.pricing.output} per million input/output tokens` : ''}{!p.capabilities.tools ? ' · chat only (no tools)' : ''}</> : p.note}</>}>
@@ -245,6 +253,7 @@ function AI() {
           <div className="callout warning small" style={{ marginTop: 10 }}><Icon name="info" size={16} />No provider is configured. See the README section “Connect an AI model”.</div>
         )}
       </Card>
+      )}
       <Card title="Usage & limits" desc="Hailey stops sending AI requests once the 24-hour or 30-day token limit is reached.">
         <Row label="Daily token limit" desc="0 = no limit">
           <input className="input" type="number" min={0} style={{ width: 160 }} value={limit} onChange={(e) => setLimit(e.target.value)} aria-label="Daily token limit" />
@@ -384,6 +393,19 @@ function Notifications() {
 
   return (
     <>
+      {MOBILE ? (
+        <Card title="Phone notifications" desc="Reminders ring on this phone, even when Hailey is closed. Routines and briefings run while the app is open or in the background.">
+          <Row label="Send a test" desc="Check that notifications are allowed for Hailey in your phone’s settings.">
+            <button className="btn sm" onClick={() => post('/push/test').then(() => toast('Test notification sent')).catch((e) => toast(e.message, 'error'))}>Send test</button>
+          </Row>
+          <Row label="Notifications" desc="Turn off to keep reminders in-app only."><Switch label="Notifications" checked={n.push} onChange={(v) => save({ notifications: { push: v } })} /></Row>
+          <Row label="Quiet hours" desc="Reminders due during quiet hours are delivered when they end.">
+            <input type="time" className="input" style={{ width: 120 }} defaultValue={n.quietHoursStart ?? ''} onBlur={(e) => save({ notifications: { quietHoursStart: e.target.value || undefined } })} aria-label="Quiet hours start" />
+            <span className="faint">to</span>
+            <input type="time" className="input" style={{ width: 120 }} defaultValue={n.quietHoursEnd ?? ''} onBlur={(e) => save({ notifications: { quietHoursEnd: e.target.value || undefined } })} aria-label="Quiet hours end" />
+          </Row>
+        </Card>
+      ) : (
       <Card title="Push notifications" desc="Reminders are scheduled on the server and delivered even when Hailey is closed. On Android, install Hailey to your home screen for the most reliable delivery; on Windows the browser must be allowed to run in the background.">
         {!push.configured ? (
           <div className="callout warning small"><Icon name="info" size={16} />Push is not configured on the server. Run <code>npm run setup</code> to generate VAPID keys, then restart. Reminders still appear in-app under Notifications.</div>
@@ -411,6 +433,7 @@ function Notifications() {
           </div>
         )}
       </Card>
+      )}
       <Card title="Routines" desc={<>Scheduled briefings built from your real data, plus routines of your own. Manage them all, and browse ideas, on the <Link to="/routines">Routines page</Link>.</>}>
         {routines.data?.routines.filter((r: any) => !r.custom).map((r: any) => (
           <Row key={r.id} label={r.title} desc={<>{r.kind === 'morning_briefing' ? 'Today’s tasks, overdue items, reminders and project deadlines.' : 'What you completed, what’s still open, project progress and tomorrow’s priorities.'}{r.last_run_at && <> · Last run {fmtDateTime(r.last_run_at)}: {r.last_status === 'failed' ? <span className="badge danger">failed</span> : 'ok'}</>}</>}>
@@ -539,10 +562,11 @@ function Privacy() {
   const sessions = useData<any>('/auth/sessions');
   const [pw, setPw] = useState({ current: '', next: '' });
   const [deleting, setDeleting] = useState(false);
+  if (MOBILE) return <PhonePrivacy />;
   return (
     <>
       <Card title="Your data" desc="Everything is stored in the SQLite database and uploads folder on your Hailey server. Nothing is sold or shared. AI requests send the relevant conversation, retrieved memories and attached document text to the AI provider you configured.">
-        <Row label="Export all data" desc="A JSON file with your tasks, notes, projects, memories, conversations and settings."><a className="btn sm" href="/api/export" download><Icon name="download" size={14} />Download export</a></Row>
+        <Row label="Export all data" desc="A JSON file with your tasks, notes, projects, memories, conversations and settings."><ApiDownload className="btn sm" href="/api/export" name="hailey-export.json"><Icon name="download" size={14} />Download export</ApiDownload></Row>
         <Row label="Offline copy on this device" desc="Pages you open are cached for offline reading. New tasks, task edits and note edits made offline are queued here and synced when you reconnect; conflicts are shown for review. Signing out clears both."><span className="badge">Read + queued edits</span></Row>
         <Row label="Sync" desc="All devices read and write the same server, so changes appear everywhere after a refresh. Offline edits are not queued — make changes when online."><span className="badge success">Server-based</span></Row>
       </Card>
@@ -568,6 +592,23 @@ function Privacy() {
       </Card>
       {deleting && <DeleteAccount onClose={() => setDeleting(false)} onDeleted={() => { toast('Account deleted'); void logout(); }} />}
       <ErrorBox error={sessions.error} />
+    </>
+  );
+}
+
+function PhonePrivacy() {
+  const confirm = useConfirm();
+  return (
+    <>
+      <Card title="Your data" desc="Everything — tasks, notes, documents, memories and chats — is stored on this phone only. Nothing is sold or shared. When you chat, the conversation, relevant memories and attached text are sent to the AI service you chose so it can reply.">
+        <Row label="Export all data" desc="A JSON file with your tasks, notes, projects, memories, conversations and settings, saved to Downloads."><ApiDownload className="btn sm" href="/api/export" name="hailey-export.json"><Icon name="download" size={14} />Download export</ApiDownload></Row>
+        <Row label="Back-ups" desc="Android can include app data in its own phone back-up. Export regularly if you want your own copy."><span className="badge">On this phone</span></Row>
+      </Card>
+      <Card title="Erase everything" desc="Deletes every task, note, document, memory, conversation, setting and your AI key from this phone. This cannot be undone — export first if you want a copy.">
+        <button className="btn danger" onClick={async () => {
+          if (await confirm({ title: 'Erase everything on this phone?', body: 'Hailey starts again from the beginning.', confirm: 'Erase everything', danger: true })) { await post('/device/reset'); location.replace('/'); }
+        }}>Erase everything…</button>
+      </Card>
     </>
   );
 }

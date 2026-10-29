@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Hailey</string>
+    <string name="channel_reminders">Reminders and briefings</string>
+    <string name="channel_reminders_description">Reminders you set, routines and approvals from Hailey.</string>
     <string name="widget_ramble">🎙 Ramble</string>
     <string name="widget_talk">💬 Talk</string>
     <string name="widget_chat">＋ Chat</string>

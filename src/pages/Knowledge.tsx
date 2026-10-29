@@ -6,6 +6,7 @@ import { useData, useDebounced } from '../lib/hooks';
 import { del, post, upload } from '../lib/api';
 import { navigate, useLocation } from '../lib/router';
 import { relative } from '../lib/format';
+import { ApiDownload } from '../components/ApiFile';
 
 export default function Knowledge() {
   const { query } = useLocation();
@@ -171,7 +172,7 @@ function Exports() {
             <li key={x.id} className="list-item">
               <Icon name="file" />
               <div className="grow" style={{ minWidth: 0 }}><div className="ellipsis" style={{ fontWeight: 600 }}>{x.filename}</div><div className="faint tiny">{x.format.toUpperCase()} · {fmtBytes(x.size)} · {relative(x.created_at)}</div></div>
-              <a className="btn sm" href={`/api/exports/${x.id}/download`}><Icon name="download" size={14} />Download</a>
+              <ApiDownload className="btn sm" href={`/api/exports/${x.id}/download`} name={x.filename}><Icon name="download" size={14} />Download</ApiDownload>
               <button className="btn ghost icon sm" aria-label={`Delete ${x.filename}`} onClick={async () => { await del(`/exports/${x.id}`); toast('Deleted'); reload(); }}><Icon name="trash" size={15} /></button>
             </li>
           ))}

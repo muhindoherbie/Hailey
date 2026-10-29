@@ -32,3 +32,6 @@ android/local.properties
 deploy/oracle/*.env
 deploy/oracle/.env
 *.pfx
+# Phone app bundle (built by npm run build:android)
+android/app/src/main/assets/www/
+dist-mobile/

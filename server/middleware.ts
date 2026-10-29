@@ -54,7 +54,7 @@ export const csrfGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const { db, now } = c.var.services;
-  const session = resolveSession(db, getCookie(c, SESSION_COOKIE), now());
+  const session = resolveSession(db, getCookie(c, SESSION_COOKIE) ?? c.var.services.deviceSession?.get(), now());
   if (!session) throw new HttpError(401, 'Please sign in', 'unauthenticated');
   c.set('user', session.user);
   c.set('sessionId', session.sessionId);
