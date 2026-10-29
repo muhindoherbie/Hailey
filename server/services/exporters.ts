@@ -82,7 +82,8 @@ export async function toDocx(title: string, md: string): Promise<Buffer> {
     }
   }
   const doc = new Document({ creator: 'Hailey', title, sections: [{ children }] });
-  return Packer.toBuffer(doc);
+  // ArrayBuffer, not Node's buffer type: the phone app runs this code in its WebView too.
+  return Buffer.from(await Packer.toArrayBuffer(doc));
 }
 
 /** Standard PDF fonts only cover WinAnsi; replace anything else so generation never fails. */
@@ -196,8 +197,8 @@ export async function toPptx(title: string, md: string): Promise<Buffer> {
     }
   }
   flush();
-  const out = await pptx.write({ outputType: 'nodebuffer' });
-  return out as Buffer;
+  const out = await pptx.write({ outputType: 'arraybuffer' });
+  return Buffer.from(out as ArrayBuffer);
 }
 
 export const EXPORT_TYPES = {
