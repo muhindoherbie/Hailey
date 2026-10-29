@@ -176,7 +176,7 @@ function Modes() {
       {a.data?.personas.map((p: any) => (
         <Row key={p.id} label={p.name} desc={<>{p.blurb}{!p.unlocked && <> · <b>{p.requirement}</b> ({p.progress}/{p.goal})</>}</>}>
           {p.unlocked ? <input type="radio" name="persona" checked={current === p.id} onChange={() => save({ profile: { persona: p.id } })} aria-label={p.name} />
-            : <span className="progress" style={{ width: 90, display: 'inline-block' }} role="progressbar" aria-valuenow={p.progress} aria-valuemax={p.goal}><span style={{ width: `${(p.progress / p.goal) * 100}%` }} /></span>}
+            : <span className="progress" style={{ width: 90, display: 'inline-block' }} role="progressbar" aria-label={`Progress to unlock ${p.name}`} aria-valuemin={0} aria-valuenow={p.progress} aria-valuemax={p.goal}><span style={{ width: `${(p.progress / p.goal) * 100}%` }} /></span>}
         </Row>
       ))}
     </Card>
@@ -272,8 +272,8 @@ function AI() {
             </div>
             {u.byDay.length > 0 && <BarChart data={u.byDay.map((d: any) => ({ label: d.day.slice(5), value: d.tokens }))} height={160} />}
             {u.byModel.length > 0 && (
-              <table className="data" style={{ marginTop: 10 }}><thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Est. cost</th></tr></thead>
-                <tbody>{u.byModel.map((m: any) => <tr key={m.model}><td>{m.model}</td><td>{m.input.toLocaleString()}</td><td>{m.output.toLocaleString()}</td><td>${m.cost.toFixed(3)}</td></tr>)}</tbody></table>
+              <div className="table-wrap" style={{ marginTop: 10 }} tabIndex={0} role="region" aria-label="AI usage by model"><table className="data"><thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Est. cost</th></tr></thead>
+                <tbody>{u.byModel.map((m: any) => <tr key={m.model}><td>{m.model}</td><td>{m.input.toLocaleString()}</td><td>{m.output.toLocaleString()}</td><td>${m.cost.toFixed(3)}</td></tr>)}</tbody></table></div>
             )}
             <p className="faint tiny" style={{ marginTop: 8 }}>{u.note}</p>
           </>
@@ -531,6 +531,8 @@ function Integrations() {
   const [url, setUrl] = useState<string | null>(null);
   return (
     <>
+      {/* A feed URL needs a server other apps can reach; the phone app has none. */}
+      {!MOBILE && (
       <Card title="Calendar feed (read-only)" desc="Show your Hailey tasks with due dates in Google Calendar, Outlook or your phone’s calendar by subscribing to a private link. Hailey does not read or change your calendars.">
         {feed.data?.enabled && !url && <p className="small" style={{ marginBottom: 8 }}>A feed link is active (created {fmtDateTime(feed.data.created_at)}). For security the link is only shown once — create a new one if you need it again.</p>}
         {url && (
@@ -545,7 +547,8 @@ function Integrations() {
         </div>
         <p className="faint tiny" style={{ marginTop: 8 }}>Google Calendar: Other calendars → From URL. Outlook: Add calendar → Subscribe from web. The calendar app must be able to reach your Hailey server’s public address.</p>
       </Card>
-      <Card title="Connected services" desc="What this Hailey server has configured. Keys are managed in the server’s .env file.">
+      )}
+      <Card title="Connected services" desc={MOBILE ? "What Hailey is connected to. Keys are set in Settings → AI service and stay on this phone." : "What this Hailey server has configured. Keys are managed in the server’s .env file."}>
         <Row label="AI">{me!.server.providers.filter((p) => p.configured).map((p) => <span key={p.id} className="badge success">{p.label}</span>)}{!me!.server.providers.some((p) => p.configured) && <span className="badge">None</span>}</Row>
         <Row label="Web research"><span className={`badge ${me!.server.search.configured ? 'success' : ''}`}>{me!.server.search.provider ?? 'Not configured'}</span></Row>
         <Row label="Push notifications"><span className={`badge ${me!.server.push.configured ? 'success' : ''}`}>{me!.server.push.configured ? 'Configured' : 'Not configured'}</span></Row>

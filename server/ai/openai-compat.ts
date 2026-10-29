@@ -37,7 +37,7 @@ export class OpenAICompatProvider implements AIProvider {
   }
 
   async chat(req: ChatRequest): Promise<ChatResult> {
-    const { baseUrl, apiKey, model } = this.opts;
+    const { baseUrl, model } = this.opts;
     if (!baseUrl || !model) throw new ProviderError('not_configured', 'The OpenAI-compatible provider is not configured on the server.');
     const body: Record<string, unknown> = {
       model,
@@ -161,7 +161,7 @@ export class OpenAICompatProvider implements AIProvider {
         });
       } catch (err: any) {
         if (err?.name === 'AbortError') throw new ProviderError('aborted', 'Response cancelled.');
-        throw new ProviderError('unavailable', `Could not reach ${this.opts.label}. Is it running and reachable from the server?`, true);
+        throw new ProviderError('unavailable', `Could not reach ${this.opts.label}. ${onOwnNetwork(baseUrl!) ? 'Is it running, and on the same Wi-Fi as this device?' : 'Check your internet connection and try again.'}`, true);
       }
       if (res.status !== 429 || attempt === attempts - 1) break;
       const after = Number(res.headers.get('retry-after'));
@@ -257,4 +257,14 @@ async function* sseData(body: ReadableStream<Uint8Array>) {
     }
   }
   if (buf.trim().startsWith('data:')) yield buf.trim().slice(5).trim();
+}
+
+/** True for an AI server on the user's own machine or home network (e.g. Ollama on a PC). */
+function onOwnNetwork(url: string): boolean {
+  try {
+    const h = new URL(url).hostname;
+    return h === 'localhost' || h === '[::1]' || h.endsWith('.local') || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+  } catch {
+    return false;
+  }
 }

@@ -115,7 +115,8 @@ function replayable(rows: Row[]): ChatMessage[] {
   return merged;
 }
 
-function usageToday(services: Services, userId: string, timeZone: string, hours = 24) {
+/** Tokens used in the last `hours` hours (a rolling window, so the user's time zone doesn't matter). */
+function usageToday(services: Services, userId: string, hours = 24) {
   const since = new Date(services.now().getTime() - hours * 3600_000).toISOString();
   return Number(services.db.get('SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n FROM usage WHERE user_id = ? AND created_at >= ?', userId, since)!.n);
 }
@@ -188,6 +189,8 @@ function turnContext(services: Services, ctx: ToolContext, conv: Row, userText: 
  * Runs one user turn: stores the message, calls the model, executes tools under the
  * permission policy, loops until the model finishes, and stores everything.
  */
+const STOPPED_NOTE = '\n\n_You stopped this reply._';
+
 export async function runTurn(
   services: Services,
   user: SessionUser,
@@ -205,11 +208,11 @@ export async function runTurn(
   });
   const info = provider.info();
   const limit = settings.ai.dailyTokenLimit ?? services.config.DAILY_TOKEN_LIMIT;
-  if (limit > 0 && usageToday(services, user.id, settings.regional.timeZone) >= limit) {
+  if (limit > 0 && usageToday(services, user.id) >= limit) {
     throw new ProviderError('rate_limited', `You have reached your daily AI usage limit (${limit.toLocaleString()} tokens in 24 hours). Raise it in Settings → AI, or try again later.`);
   }
   const monthly = settings.ai.monthlyTokenLimit ?? 0;
-  if (monthly > 0 && usageToday(services, user.id, settings.regional.timeZone, 30 * 24) >= monthly) {
+  if (monthly > 0 && usageToday(services, user.id, 30 * 24) >= monthly) {
     throw new ProviderError('rate_limited', `You have reached your monthly AI usage limit (${monthly.toLocaleString()} tokens in 30 days). Raise it in Settings → AI, or try again later.`);
   }
 
@@ -241,10 +244,34 @@ export async function runTurn(
   let totalOut = 0;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const result = await provider.chat({
-      system, messages, tools, signal: opts.signal,
-      onText: (delta) => opts.emit({ type: 'text', delta }),
-    });
+    let streamed = '';
+    let result;
+    try {
+      result = await provider.chat({
+        system, messages, tools, signal: opts.signal,
+        onText: (delta) => { streamed += delta; opts.emit({ type: 'text', delta }); },
+      });
+    } catch (err) {
+      // Stop pressed: keep what the person has already read instead of throwing it away.
+      const sofar = finalText + (finalText && streamed ? '\n\n' : '') + streamed;
+      if (!(err instanceof ProviderError && err.kind === 'aborted') || !sofar.trim()) throw err;
+      const content = sofar + STOPPED_NOTE;
+      const row = db.insert('messages', {
+        user_id: user.id, conversation_id: conversationId, role: 'assistant', content,
+        api_content: JSON.stringify([{ type: 'text', text: sofar }]),
+        meta: JSON.stringify({ provider: info.id, model: info.model, stopped: true, tools: toolEvents }),
+      });
+      db.run(
+        "UPDATE messages SET meta = json_set(meta, '$.hidden', 1) WHERE conversation_id = ? AND role = 'assistant' AND created_at >= ? AND id != ?",
+        conversationId, userMsg.created_at, row.id,
+      );
+      indexEntity(db, user.id, 'message', row.id, conv.title, content);
+      db.run('UPDATE conversations SET updated_at = ? WHERE id = ?', nowIso(), conversationId);
+      const message = { ...row, content, meta: { provider: info.id, model: info.model, stopped: true, tools: toolEvents } };
+      opts.emit({ type: 'message', message });
+      opts.emit({ type: 'done' });
+      return { userMessage: userMsg, message };
+    }
     totalIn += result.usage.inputTokens;
     totalOut += result.usage.outputTokens;
     recordUsage(services, user.id, info.id, result.model, result.usage, info.pricing);

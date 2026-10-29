@@ -104,7 +104,7 @@ export default function DocumentView({ id }: { id: string }) {
                 {a.cleaning.length > 0 && <div className="callout warning small"><Icon name="info" size={16} /><div>{a.cleaning.map((c: string) => <div key={c}>{c}</div>)}</div></div>}
                 <div className="card">
                   <div className="card-head"><h3>Columns</h3></div>
-                  <div className="card-body table-wrap" style={{ border: 0 }}>
+                  <div className="card-body table-wrap" style={{ border: 0 }} tabIndex={0} role="region" aria-label="Column summary">
                     <table className="data">
                       <thead><tr><th>Column</th><th>Type</th><th>Values</th><th>Missing</th><th>Sum</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th></tr></thead>
                       <tbody>{a.columns.map((c: any) => (
@@ -132,7 +132,7 @@ export default function DocumentView({ id }: { id: string }) {
                 )}
                 <div className="card pad small muted"><strong>How these figures were calculated</strong><ul>{a.notes.map((n: string) => <li key={n}>{n}</li>)}</ul></div>
                 <div className="card"><div className="card-head"><h3>Preview (first 100 rows)</h3></div>
-                  <div className="card-body"><div className="table-wrap"><table className="data">
+                  <div className="card-body"><div className="table-wrap" tabIndex={0} role="region" aria-label="Preview rows"><table className="data">
                     <thead><tr>{analysis.data.preview.headers.map((h: string) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>{analysis.data.preview.rows.map((r: any[], i: number) => <tr key={i}>{r.map((c, j) => <td key={j}>{c ?? ''}</td>)}</tr>)}</tbody>
                   </table></div></div>

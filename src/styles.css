@@ -14,7 +14,7 @@
   --border-strong: #d4d0c6;
   --text: #1c1e1f;
   --text-2: #55595c;
-  --text-3: #85898b;
+  --text-3: #676b6d;
   --brand: #0f5f58;
   --brand-hover: #0b4d47;
   --brand-soft: #e3efed;
@@ -39,6 +39,8 @@
   --r-lg: 22px;
   --sidebar: 248px;
   --topbar: 56px;
+  /* Height of the phone navigation bar (without the system gesture area). */
+  --navbar: 76px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --fs: 15px;
 
@@ -79,7 +81,7 @@
     --border-strong: #3a3f43;
     --text: #eceeee;
     --text-2: #aeb4b6;
-    --text-3: #7d8487;
+    --text-3: #8f969a;
     --brand: #3fb3a5;
     --brand-hover: #5cc4b7;
     --brand-soft: #16302d;
@@ -110,7 +112,7 @@
   --border-strong: #3a3f43;
   --text: #eceeee;
   --text-2: #aeb4b6;
-  --text-3: #7d8487;
+  --text-3: #8f969a;
   --brand: #3fb3a5;
   --brand-hover: #5cc4b7;
   --brand-soft: #16302d;
@@ -142,7 +144,7 @@
   --border-strong: #c8d2e0;
   --text: #0B1220;
   --text-2: #475569;
-  --text-3: #64748b;
+  --text-3: #5b6a80;
   --brand: #0f766e;
   --brand-hover: #115e59;
   --brand-soft: #e0f5f2;
@@ -163,7 +165,7 @@
     --border-strong: #33465f;
     --text: #F8FAFC;
     --text-2: #94A3B8;
-    --text-3: #8291a7;
+    --text-3: #8a99ae;
     --brand: #14B8A6;
     --brand-hover: #2dd4bf;
     --brand-soft: #0f2e33;
@@ -185,7 +187,7 @@
   --border-strong: #33465f;
   --text: #F8FAFC;
   --text-2: #94A3B8;
-  --text-3: #8291a7;
+  --text-3: #8a99ae;
   --brand: #14B8A6;
   --brand-hover: #2dd4bf;
   --brand-soft: #0f2e33;
@@ -283,14 +285,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
     animation: slideIn 0.2s var(--ease);
   }
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 55; }
-  .page { padding: 16px 16px 96px; }
+  .page { padding: 16px 16px calc(var(--navbar) + 24px + env(safe-area-inset-bottom)); }
   .topbar { padding: 0 12px; }
   .mobile-only { display: inline-flex !important; }
   select.mobile-only { display: block !important; }
   .desktop-only { display: none !important; }
+  /* A button's text label hides on phones, but screen readers still read it. */
+  .btn .desktop-only, a .desktop-only {
+    display: inline !important; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
   .bottom-nav {
     display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
     background: var(--surface-container); padding: 10px 4px calc(12px + env(safe-area-inset-bottom)); view-transition-name: bottom-nav;
+    height: calc(var(--navbar) + env(safe-area-inset-bottom)); align-items: start;
   }
   .bottom-nav a {
     display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.72em; color: var(--text-2); padding: 0;
@@ -298,7 +305,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   }
   .bottom-nav a.active { color: var(--text); font-weight: 700; }
   /* Active indicator: a pill that grows out from the icon (M3 navigation bar). */
-  .bottom-nav .tab-ic { display: grid; place-items: center; width: 64px; height: 32px; border-radius: 16px; position: relative; color: var(--text-2); }
+  .bottom-nav .tab-ic { display: grid; place-items: center; width: min(64px, 100%); height: 32px; border-radius: 16px; position: relative; color: var(--text-2); }
   .bottom-nav .tab-ic::before {
     content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--brand-soft); scale: 0.4 1; opacity: 0;
     transition: scale var(--dur-medium) var(--ease-enter), opacity var(--dur-short);
@@ -447,7 +454,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .empty h3 { color: var(--text); margin-bottom: 4px; }
 .empty p { max-width: 380px; margin: 0 auto 14px; font-size: 0.92em; }
 .toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; max-width: min(380px, calc(100vw - 32px)); }
-@media (max-width: 860px) { .toasts { bottom: 84px; right: 16px; left: 16px; max-width: none; } }
+@media (max-width: 860px) { .toasts { bottom: calc(var(--navbar) + 12px + env(safe-area-inset-bottom)); right: 16px; left: 16px; max-width: none; } }
 .toast {
   background: var(--inverse-surface); color: var(--inverse-on-surface); padding: 13px 16px; border-radius: var(--shape-sm); box-shadow: var(--shadow-2); display: flex; gap: 10px;
   align-items: flex-start; animation: rise-in var(--dur-medium) var(--ease-enter); font-size: 0.92em;
@@ -504,15 +511,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .md pre:hover .copy-code, .copy-code:focus { opacity: 1; }
 
 /* ---------- Chat ---------- */
-.chat-layout { display: grid; grid-template-columns: 290px 1fr; height: calc(100vh - var(--topbar)); height: calc(100dvh - var(--topbar)); }
+.chat-layout { display: grid; grid-template-columns: 290px 1fr; grid-template-rows: minmax(0, 1fr); height: calc(100vh - var(--topbar)); height: calc(100dvh - var(--topbar)); }
 .chat-list { border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 10px; background: var(--surface-2); }
 .chat-list .conv { display: block; padding: 8px 10px; border-radius: 10px; color: var(--text); text-decoration: none; }
 .chat-list .conv:hover { background: var(--bg-sunken); text-decoration: none; }
 .chat-list .conv.active { background: var(--brand-soft); }
 .chat-list .conv .t { font-weight: 600; font-size: 0.9em; }
 .chat-list .conv .p { font-size: 0.78em; color: var(--text-3); }
-.chat-main { display: flex; flex-direction: column; min-width: 0; height: 100%; }
-.chat-scroll { flex: 1; overflow-y: auto; padding: 24px 20px 12px; }
+.chat-main { display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; }
+/* min-height: 0 lets the thread shrink and scroll, so the message box always stays on screen. */
+.chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 20px 12px; }
 .chat-thread { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 .msg { display: flex; gap: 12px; animation: fadeUp 0.2s var(--ease); }
 .msg.user { justify-content: flex-end; }
@@ -548,7 +556,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .approval { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; }
 .recording { color: var(--danger) !important; animation: pulse 1.2s infinite; }
 @media (max-width: 860px) {
-  .chat-layout { grid-template-columns: 1fr; height: calc(100vh - var(--topbar) - 64px - env(safe-area-inset-bottom)); height: calc(100dvh - var(--topbar) - 64px - env(safe-area-inset-bottom)); }
+  .chat-layout { grid-template-columns: 1fr; height: calc(100vh - var(--topbar) - var(--navbar) - env(safe-area-inset-bottom)); height: calc(100dvh - var(--topbar) - var(--navbar) - env(safe-area-inset-bottom)); }
   html.kb-open .chat-layout { height: calc(100dvh - var(--topbar)); }
   .chat-list { display: none; }
   .chat-list.open { display: block; position: fixed; inset: var(--topbar) 0 0 0; z-index: 30; }
@@ -623,6 +631,8 @@ table.data { width: 100%; border-collapse: collapse; font-size: 0.88em; }
 table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
 table.data th { font-weight: 650; color: var(--text-2); background: var(--surface-2); position: sticky; top: 0; }
 .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--r); max-height: 420px; }
+/* Grid and flex children may shrink below their content (a wide table scrolls inside its box instead of widening the page). */
+.page > *, .settings-grid > *, .card { min-width: 0; }
 .settings-nav { position: sticky; top: calc(var(--topbar) + 16px); }
 .setting { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
 .setting:last-child { border-bottom: 0; }
@@ -826,3 +836,16 @@ html.kb-open .page { padding-bottom: 16px; }
 .list > li, .task-list > *, .chat-list .conv { content-visibility: auto; contain-intrinsic-size: auto 56px; }
 .filter-panel:not([hidden]) { animation: rise-in var(--dur-medium) var(--ease-enter); }
 .filter-panel .select { width: auto; flex: 1 1 140px; }
+.speed-results { margin-top: 8px; }
+.speed-results .list { border: 1px solid var(--border); border-radius: var(--r-sm); }
+.speed-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 40px; border-bottom: 1px solid var(--border); }
+.speed-row:last-child { border-bottom: 0; }
+.speed-row.failed { color: var(--text-2); }
+.speed-row .tiny { white-space: nowrap; }
+
+/* Links inside sentences are underlined, so they don't rely on colour alone (WCAG 1.4.1). */
+p a:not(.btn), li a:not(.btn), .desc a:not(.btn), .hint a:not(.btn), .callout a:not(.btn), .sub a:not(.btn), .md a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* A list item wrapping a button or link, so the control keeps its own role for screen readers. */
+.li-wrap { display: flex; min-width: 0; }
+.li-wrap > .discover-card, .li-wrap > .chip { flex: 1 1 auto; }

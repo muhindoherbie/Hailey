@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { compress } from 'hono/compress';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { ZodError } from 'zod';
@@ -78,7 +79,9 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
 
   const api = new Hono<AppEnv>();
   api.use('*', csrfGuard);
-  api.use('*', rateLimit({ name: 'api', windowMs: 60_000, max: 600, key: clientIp }));
+  // Protects the PC server from floods over the network. The phone app's engine serves a single
+  // person in-process, so it doesn't limit itself (bulk actions there must not hit a 429).
+  if (!services.deviceSession) api.use('*', rateLimit({ name: 'api', windowMs: 60_000, max: 600, key: clientIp }));
   api.use('/documents', bodyLimit({ maxSize: (services.config.MAX_UPLOAD_MB + 1) * 1024 * 1024, onError: (c) => c.json({ error: `File is too large. The limit is ${services.config.MAX_UPLOAD_MB} MB.`, code: 'too_large' }, 413) }));
   api.use('*', async (c, next) => {
     if (c.req.path.endsWith('/documents') && c.req.method === 'POST') return next();
@@ -101,6 +104,10 @@ export function createApp(services: Services, opts: { staticDir?: string } = {})
   const staticDir = opts.staticDir;
   if (staticDir && existsSync(staticDir)) {
     const root = relative(process.cwd(), staticDir) || '.';
+    // Compress the app's own files (about 3× smaller over Wi-Fi or a tunnel). The API is left
+    // alone so streamed chat replies arrive word by word instead of being buffered.
+    const zip = compress();
+    app.use('*', (c, next) => (c.req.path.startsWith('/api/') ? next() : zip(c, next)));
     app.use('/assets/*', async (c, next) => {
       await next();
       c.header('Cache-Control', 'public, max-age=31536000, immutable');

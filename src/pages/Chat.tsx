@@ -156,8 +156,10 @@ function NotConfigured() {
     <div className="callout warning">
       <Icon name="info" size={18} style={{ flex: 'none', marginTop: 2 }} />
       <div>
-        <strong>No AI provider is connected yet.</strong> Hailey’s tasks, notes, projects, reminders and memory all work without one, but chat needs a model.
-        Add <code>ANTHROPIC_API_KEY</code> (Claude) or an OpenAI-compatible endpoint such as a free local Ollama model to the server’s <code>.env</code> file, then restart. See <Link to="/settings#ai">Settings → AI</Link>.
+        <strong>No AI service is connected yet.</strong> Hailey’s tasks, notes, projects, reminders and memory all work without one, but chat needs a model.
+        {import.meta.env.VITE_MOBILE
+          ? <> Pick a free one (Gemini, Groq, OpenRouter and more) and paste its key in <Link to="/settings#ai">Settings → AI service</Link>. It takes a minute.</>
+          : <> Add <code>ANTHROPIC_API_KEY</code> (Claude) or an OpenAI-compatible endpoint such as a free local Ollama model to the server’s <code>.env</code> file, then restart. See <Link to="/settings#ai">Settings → AI</Link>.</>}
       </div>
     </div>
   );

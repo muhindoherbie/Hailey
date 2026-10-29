@@ -2,7 +2,6 @@
 // over the network, with SQLite (WebAssembly) and files saved on the device. Nothing needs a
 // separate server or tunnel; the AI provider is called directly with the user's own key.
 import './globals.ts';
-import { Buffer } from './buffer.ts';
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import sqliteWasmUrl from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url';
 import { configureSqlite, type DatabaseSync } from './shims/sqlite.ts';
@@ -10,6 +9,7 @@ import { flushFiles, loadFiles, preloadFiles, seedFile } from './shims/fs.ts';
 import { idbDeleteAll, idbGet, idbWrite } from './idb.ts';
 import { makeNetFetch, notify, setAlarms, isNative } from './native.ts';
 import { configToEnv, maskConfig, PRESETS, type DeviceConfig } from './presets.ts';
+import { speedTest } from './speedtest.ts';
 import { loadConfig } from '../server/config.ts';
 import { Db } from '../server/db/index.ts';
 import { createRegistry } from '../server/ai/providers.ts';
@@ -18,6 +18,7 @@ import { startScheduler } from '../server/services/scheduler.ts';
 import { startTelegram } from '../server/services/telegram.ts';
 import { createApp } from '../server/app.ts';
 import { createSession, resolveSession } from '../server/auth.ts';
+import { createAccount, NO_PASSWORD } from '../server/routes/auth.ts';
 import { updateSettings } from '../server/services/settings.ts';
 import type { Services } from '../server/context.ts';
 import type { PushService } from '../server/services/push.ts';
@@ -104,13 +105,10 @@ async function ensureOwner() {
   if (user) {
     token = createSession(services.db, user.id, 'Phone', services.now()).token;
   } else {
-    // First start: create the phone's one account. Its password is random and never needed.
-    const password = Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('base64url');
-    const res = await app.fetch(new Request(`${location.origin}/api/auth/signup`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-hailey': '1' },
-      body: JSON.stringify({ email: 'me@this-phone.app', password, name: 'Friend', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: navigator.language }),
-    }));
-    if (!res.ok) throw new Error(`Could not set up the app (${res.status})`);
+    // First start: create the phone's one account. It has no password: the app signs in with its
+    // own session (no slow password hashing on a phone for a password nobody types).
+    const u = createAccount(services.db, { email: 'me@this-phone.app', name: 'Friend', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: navigator.language }, NO_PASSWORD);
+    token = createSession(services.db, u.id, 'Phone', services.now()).token;
     const uid = services.db.get('SELECT id FROM users LIMIT 1')!.id;
     updateSettings(services.db, uid, { notifications: { push: true } });
   }
@@ -147,6 +145,18 @@ async function deviceRoute(req: Request, path: string): Promise<Response> {
     } catch {
       return json({ models: [], error: `Could not reach ${p.label}.` });
     }
+  }
+  if (path === '/api/device/speedtest' && req.method === 'POST') {
+    // Times each free model with this key, from this phone, and returns them fastest first.
+    const body = (await req.json().catch(() => ({}))) as Partial<DeviceConfig> & { models?: string[] };
+    const p = PRESETS.find((x) => x.id === (body.provider ?? device.provider));
+    if (!p || p.hidden) return json({ results: [] });
+    const masked = !body.apiKey || body.apiKey.startsWith('••••');
+    const key = (masked && body.provider === device.provider) || !body.provider ? device.apiKey : body.apiKey;
+    const base = (p.ownAddress ? (body.baseUrl || device.baseUrl) : p.baseUrl)?.replace(/\/$/, '');
+    if (!base) return json({ results: [] });
+    const models = (Array.isArray(body.models) && body.models.length ? body.models : p.models.map((m) => m.id)).map(String);
+    return json({ results: await speedTest(fetch, base, key, models) });
   }
   if (path === '/api/device/config' && req.method === 'PUT') {
     const body = (await req.json().catch(() => ({}))) as Partial<DeviceConfig>;
@@ -195,6 +205,11 @@ export async function handle(req: Request): Promise<Response> {
 }
 
 // --- Start ------------------------------------------------------------------------------------
+/** How long each start-up step took, for the "engine ready" log line. */
+const timings: Record<string, number> = {};
+let mark = performance.now();
+const lap = (name: string) => { const t = performance.now(); timings[name] = Math.round(t - mark); mark = t; };
+
 async function boot() {
   const webFetch = window.fetch.bind(window);
   const netFetch = makeNetFetch(webFetch);
@@ -213,12 +228,15 @@ async function boot() {
     (sqlite3InitModule as any)({ locateFile: () => sqliteWasmUrl, print: () => {}, printErr: (m: string) => console.warn(m) }),
     loadFiles(),
   ]);
+  lap('sqlite');
   for (const [file, sql] of Object.entries(MIGRATIONS)) seedFile(`${MIGRATIONS_DIR}/${file.split('/').pop()}`, sql);
   configureSqlite(sqlite3, { initial: await idbGet<Uint8Array>('db', 'main'), onWrite: scheduleSave });
+  lap('load');
 
   device = (await idbGet<DeviceConfig>('kv', 'device')) ?? { provider: null };
   const config = loadConfig(envFor(device));
   const db = new Db(`${DATA_DIR}/hailey.db`, MIGRATIONS_DIR);
+  lap('open');
   services = {
     db, config,
     providers: createRegistry(config),
@@ -234,8 +252,12 @@ async function boot() {
     },
   };
   app = createApp(services);
+  lap('server');
   await ensureOwner();
-  await save();
+  // Saved in the background (a fresh install's first save takes about a second on a phone).
+  // If the app closes before it lands, the next start simply rebuilds the same empty setup.
+  scheduleSave();
+  lap('owner');
 
   startScheduler(services);
   startTelegram(services);
@@ -247,5 +269,5 @@ async function boot() {
   (globalThis as any).__flushEngine = flush;
 }
 
-const ready = boot().then(() => console.info('Hailey engine ready'));
+const ready = boot().then(() => console.info(`Hailey engine ready (${Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', ')})`));
 export const engineReady = ready;
