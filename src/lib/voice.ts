@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { listen, nativeSpeech, speakNative, stopListening, stopSpeakingNative } from '../../mobile/native';
 
 /**
  * Speech-to-text via the browser's Web Speech API. Recording only happens while the user
@@ -6,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * processed by the browser vendor's cloud service — the UI says so.
  */
 export function speechSupported() {
+  if (nativeSpeech) return true; // the Android app uses the phone's own speech recognition
   return typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 }
 
@@ -24,10 +26,37 @@ export function useDictation(lang: string, onFinal: (text: string) => void, opts
 
   const stop = useCallback(() => {
     wanted.current = false;
-    rec.current?.stop();
+    if (nativeSpeech) stopListening();
+    else rec.current?.stop();
   }, []);
 
+  const startNative = useCallback(() => {
+    setError(null);
+    wanted.current = !!opts.continuous;
+    setListening(true);
+    const onEvent = (e: { partial?: string; final?: string; error?: string; end?: boolean }) => {
+      if (e.partial !== undefined) setInterim(e.partial);
+      if (e.final) {
+        setInterim('');
+        finalRef.current(e.final.trim());
+      }
+      if (e.error) {
+        if (e.error === 'no-speech' && wanted.current) return;
+        wanted.current = false;
+        setError(e.error === 'not-allowed' ? 'Microphone access was blocked. Allow it for this app in your phone’s settings.' : e.error === 'no-speech' ? 'No speech was heard. Try again.' : `Voice input error: ${e.error}`);
+      }
+      if (e.end) {
+        setInterim('');
+        // Android ends each session after a pause; keep going for continuous dictation.
+        if (wanted.current) listen(lang || 'en-US', onEvent);
+        else setListening(false);
+      }
+    };
+    listen(lang || 'en-US', onEvent);
+  }, [lang, opts.continuous]);
+
   const start = useCallback(() => {
+    if (nativeSpeech) return startNative();
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       setError('Voice input is not supported in this browser. Try Chrome or Edge, or type instead.');
@@ -87,20 +116,27 @@ export function useDictation(lang: string, onFinal: (text: string) => void, opts
 
   useEffect(() => () => {
     wanted.current = false;
-    rec.current?.abort?.();
+    if (nativeSpeech) stopListening();
+    else rec.current?.abort?.();
   }, []);
   return { listening, interim, error, start, stop, supported: speechSupported(), clearError: () => setError(null) };
 }
 
 /** Text-to-speech with the browser's built-in voices (works offline for local voices). */
+const plainText = (text: string) => text
+  .replace(/```[\s\S]*?```/g, ' (code omitted) ')
+  .replace(/[#*_`>|]/g, '')
+  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  .slice(0, 4000);
+
 export function speak(text: string, opts: { lang?: string; voiceName?: string } = {}) {
+  if (nativeSpeech) {
+    speakNative(plainText(text), opts.lang || 'en-US');
+    return true;
+  }
   if (!('speechSynthesis' in window)) return false;
   window.speechSynthesis.cancel();
-  const plain = text
-    .replace(/```[\s\S]*?```/g, ' (code omitted) ')
-    .replace(/[#*_`>|]/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .slice(0, 4000);
+  const plain = plainText(text);
   const u = new SpeechSynthesisUtterance(plain);
   u.lang = opts.lang || 'en-US';
   const voice = window.speechSynthesis.getVoices().find((v) => v.name === opts.voiceName);
@@ -112,6 +148,7 @@ export function speak(text: string, opts: { lang?: string; voiceName?: string } 
 /** Speaks and resolves when finished (or immediately when speech isn't available). */
 export function speakAsync(text: string, opts: { lang?: string; voiceName?: string } = {}) {
   return new Promise<void>((resolve) => {
+    if (nativeSpeech) return speakNative(plainText(text), opts.lang || 'en-US', resolve);
     if (!('speechSynthesis' in window)) return resolve();
     if (!speak(text, opts)) return resolve();
     // speak() queued exactly one utterance; poll for the end, since onend is unreliable on some browsers.
@@ -126,5 +163,6 @@ export function speakAsync(text: string, opts: { lang?: string; voiceName?: stri
 }
 
 export function stopSpeaking() {
+  if (nativeSpeech) return stopSpeakingNative();
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }

@@ -24,6 +24,7 @@ export function authRoutes() {
   const limiter = rateLimit({ name: 'auth', windowMs: 15 * 60_000, max: 20, key: clientIp });
 
   function setSessionCookie(c: any, token: string, expires: Date) {
+    c.var.services.deviceSession?.set(token);
     setCookie(c, SESSION_COOKIE, token, {
       httpOnly: true, sameSite: 'Lax', path: '/', expires,
       secure: c.var.services.config.isProd || new URL(c.var.services.config.PUBLIC_URL).protocol === 'https:',
@@ -79,6 +80,7 @@ export function authRoutes() {
   r.post('/logout', requireAuth, (c) => {
     destroySession(c.var.services.db, c.var.sessionId);
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    c.var.services.deviceSession?.set(null);
     return c.json({ ok: true });
   });
 
@@ -131,6 +133,7 @@ export function authRoutes() {
     });
     for (const sub of ['uploads', 'exports']) rmSync(resolve(config.DATA_DIR, sub, uid), { recursive: true, force: true });
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    c.var.services.deviceSession?.set(null);
     return c.json({ deleted: true });
   });
 

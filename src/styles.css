@@ -716,3 +716,12 @@ html.kb-open .page { padding-bottom: 16px; }
   .card.clickable:hover, .list-item.clickable:hover { background: var(--bg-sunken); }
 }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Phone app: choosing the AI service */
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.preset { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 11px 12px; border-radius: var(--r-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.preset.on { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent); }
+.preset-name { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 650; }
+.linklike { background: none; border: 0; padding: 0; color: var(--brand); text-decoration: underline; font: inherit; cursor: pointer; }
+.img-loading { display: inline-block; min-width: 48px; min-height: 48px; background: var(--surface-2); border-radius: var(--r-sm); }
+.device-ai details summary { cursor: pointer; color: var(--text-2, inherit); }

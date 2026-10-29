@@ -4,6 +4,8 @@ import { ToastProvider, ConfirmProvider, Spinner } from './components/ui';
 import { match, useLocation, useSwNavigation } from './lib/router';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
+import { MobileBridge } from './components/MobileBridge';
+import { MOBILE } from './lib/device';
 
 const Chat = lazy(() => import('./pages/Chat'));
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -76,6 +78,7 @@ export function App() {
     <ToastProvider>
       <ConfirmProvider>
         <SessionProvider>
+          {MOBILE && <MobileBridge />}
           <Router />
         </SessionProvider>
       </ConfirmProvider>

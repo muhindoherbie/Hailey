@@ -1,41 +1,29 @@
-// Hailey for Android: a Trusted Web Activity that opens your Hailey server full-screen.
-// Build: gradle assembleRelease -PhaileyUrl=https://your-address (CI passes this from a repo variable).
+// Hailey for Android: the whole app runs on the phone (no server needed). The web app and
+// Hailey's server code are built into src/main/assets/www by `npm run build:android` first.
+// Build: gradle assembleRelease -PappVersion=3.0.0
 plugins {
     id 'com.android.application'
 }
 
-def haileyUrl = (project.findProperty('haileyUrl') ?: 'https://example.ngrok-free.dev').toString().replaceAll('/+$', '')
-def haileyHost = new URI(haileyUrl).host
 def appVersion = (project.findProperty('appVersion') ?: '1.0.0').toString()
 def parts = appVersion.tokenize('.').collect { it.replaceAll('[^0-9]', '') ?: '0' }.collect { it as int }
 def versionCodeValue = parts[0] * 10000 + (parts.size() > 1 ? parts[1] : 0) * 100 + (parts.size() > 2 ? parts[2] : 0)
 
 android {
-    namespace 'app.hailey.twa'
+    namespace 'app.hailey.android'
     compileSdk 36
 
-    // AGP 9 turns resValue off by default; the launch URL is injected through it.
     buildFeatures {
-        resValues true
+        buildConfig true
     }
 
     defaultConfig {
+        // Kept from the earlier web-wrapper app, so this version installs as an update over it.
         applicationId 'app.hailey.twa'
-        minSdk 24
+        minSdk 26
         targetSdk 36
         versionCode versionCodeValue
         versionName appVersion
-        manifestPlaceholders = [hostName: haileyHost]
-        resValue 'string', 'launchUrl', "${haileyUrl}/"
-        // Puts Hailey in Android's Share menu; mirrors share_target in the web manifest (vite.config.ts).
-        def shareTarget = groovy.json.JsonOutput.toJson([
-            action: "${haileyUrl}/share-target", method: 'POST', enctype: 'multipart/form-data',
-            params: [title: 'title', text: 'text', url: 'url', files: [[name: 'files', accept: ['image/*', 'application/pdf', 'text/*',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']]]],
-        ])
-        resValue 'string', 'share_target', shareTarget.replace('"', '\\"')
-        resValue 'string', 'asset_statements', "[{\\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"${haileyUrl}\\\"}}]"
     }
 
     signingConfigs {
@@ -58,12 +46,27 @@ android {
         }
     }
 
+    // sqlite3.wasm must stay uncompressed-readable; compression is fine for everything else.
+    androidResources {
+        noCompress += ['wasm']
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
 
+// The bundled app must exist; otherwise the APK would open to a blank screen.
+tasks.register('checkWebAssets') {
+    doLast {
+        if (!file('src/main/assets/www/index.html').exists()) {
+            throw new GradleException('Missing src/main/assets/www — run `npm run build:android` in the repository root first.')
+        }
+    }
+}
+tasks.named('preBuild') { dependsOn 'checkWebAssets' }
+
 dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+    implementation 'androidx.webkit:webkit:1.14.0'
 }

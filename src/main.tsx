@@ -4,14 +4,21 @@ import './styles.css';
 import { App } from './App';
 import { startSync } from './lib/sync';
 
-createRoot(document.getElementById('root')!).render(
+const render = () => createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 );
 
+// The phone app runs Hailey's server inside itself; start it before the first API call.
+if (import.meta.env.VITE_MOBILE) {
+  import('../mobile/engine').then((m) => m.engineReady).then(render, (err) => {
+    document.getElementById('root')!.textContent = `Hailey could not start: ${err?.message ?? err}`;
+  });
+} else render();
+
 // Register the service worker in production builds (offline shell + push notifications).
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !import.meta.env.VITE_MOBILE) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => console.warn('Service worker registration failed', err));
   });

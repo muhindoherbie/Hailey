@@ -7,6 +7,7 @@ import { del, post } from '../lib/api';
 import { Link, navigate } from '../lib/router';
 import { fmtDateTime } from '../lib/format';
 import { useSession } from '../lib/session';
+import { ApiDownload, ApiImg } from '../components/ApiFile';
 
 export default function DocumentView({ id }: { id: string }) {
   const toast = useToast();
@@ -53,7 +54,7 @@ export default function DocumentView({ id }: { id: string }) {
   return (
     <Shell title={<Link to="/knowledge?tab=documents" className="muted">Documents</Link>} actions={
       <>
-        <a className="btn sm" href={`/api/documents/${id}/download`}><Icon name="download" size={15} /><span className="desktop-only">Original</span></a>
+        <ApiDownload className="btn sm" href={`/api/documents/${id}/download`} name={d.filename}><Icon name="download" size={15} /><span className="desktop-only">Original</span></ApiDownload>
         <button className="btn primary sm" onClick={ask} disabled={!ai}><Icon name="chat" size={15} /><span className="desktop-only">Ask Hailey</span></button>
       </>
     }>
@@ -67,7 +68,7 @@ export default function DocumentView({ id }: { id: string }) {
 
         {isImage && (
           <section className="card pad">
-            <img className="doc-image" src={`/api/documents/${id}/preview`} alt={d.filename} />
+            <ApiImg className="doc-image" src={`/api/documents/${id}/preview`} alt={d.filename} />
             <p className="faint small" style={{ marginTop: 8 }}>Use <b>Ask Hailey</b> to have the AI look at this image. That needs a model that can view images, such as Claude.</p>
           </section>
         )}
