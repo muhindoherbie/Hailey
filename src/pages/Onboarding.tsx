@@ -28,8 +28,8 @@ export default function Onboarding() {
   const ideas = useData<any>('/routines/ideas');
   const builtIns = useData<any>('/routines');
   const [step, setStep] = useState(0);
-  // The phone app's account starts as “Friend”; ask for a real name instead of suggesting that.
-  const [you, setYou] = useState(MOBILE && !me!.settings.profile.displayName ? '' : me!.settings.profile.displayName || me!.user.name);
+  // The phone app's account starts as “Friend”; ask for a real name instead of suggesting it.
+  const [you, setYou] = useState(() => { const n = me!.settings.profile.displayName || me!.user.name; return MOBILE && n === 'Friend' ? '' : n; });
   const [assistant, setAssistant] = useState(me!.settings.profile.assistantName || 'Hailey');
   const [interests, setInterests] = useState<string[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set(['morning_briefing']));

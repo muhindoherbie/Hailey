@@ -88,14 +88,17 @@ jobs:
       - uses: actions/checkout@v7
       - name: Version
         run: echo "V=${VERSION#v}" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Build the app bundle
+        run: npm run build:android
       - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v6
         with: { gradle-version: '9.8.1' }
       - name: Check configuration
-        run: |
-          test -n "${{ vars.HAILEY_URL }}" || { echo "Set the HAILEY_URL repository variable"; exit 1; }
-          test -n "${{ secrets.HAILEY_KEYSTORE_B64 }}" || { echo "Missing HAILEY_KEYSTORE_B64 secret"; exit 1; }
+        run: test -n "${{ secrets.HAILEY_KEYSTORE_B64 }}" || { echo "Missing HAILEY_KEYSTORE_B64 secret"; exit 1; }
       - name: Build signed APK
         working-directory: android
         env:
@@ -103,7 +106,7 @@ jobs:
         run: |
           echo "${{ secrets.HAILEY_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/hailey.p12"
           export HAILEY_KEYSTORE_FILE="$RUNNER_TEMP/hailey.p12"
-          gradle assembleRelease --no-daemon -PhaileyUrl="${{ vars.HAILEY_URL }}" -PappVersion="$V"
+          gradle assembleRelease --no-daemon -PappVersion="$V"
           rm -f "$RUNNER_TEMP/hailey.p12"
           cp app/build/outputs/apk/release/app-release.apk "../Hailey-$V.apk"
       - name: Verify signature
@@ -135,7 +138,7 @@ jobs:
 
           **Windows:** download \`Hailey-Setup-$V.exe\` and run it. The installer is signed by *Hailey (muhindoherbie)* with a self-made certificate. On a PC that trusts that certificate (see the README) Windows shows it as the verified publisher; elsewhere Windows may still show *"Windows protected your PC"* — click **More info → Run anyway**. Hailey then runs in its own window and in the system tray. Add your AI key via the tray icon → *Edit settings*, then *Restart Hailey*.
 
-          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It is signed, and opens your Hailey at ${{ vars.HAILEY_URL }}.
+          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It is a standalone app: Hailey runs on the phone itself, so no PC or tunnel is needed. On first start, pick a free AI service (Groq or Google Gemini) and paste its key.
 
           Built from commit ${{ github.sha }}.
           EOF

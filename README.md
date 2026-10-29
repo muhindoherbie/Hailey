@@ -3,7 +3,7 @@
 **Your personal AI assistant, companion and productivity agent.**
 Hailey helps you think clearly, remember what matters, organise your responsibilities, learn continuously, manage your projects and get everyday work done — through one assistant that runs on a server you control.
 
-It is an installable web app (PWA) for Windows and Android browsers, backed by a small Node.js server that keeps your data in one SQLite file.
+It is an installable web app (PWA) for Windows and Android browsers, backed by a small Node.js server that keeps your data in one SQLite file. The **Android app is standalone**: Hailey's server runs inside the app on the phone, so it needs no PC, tunnel or address — just a free AI key.
 
 ---
 
@@ -27,7 +27,7 @@ It is an installable web app (PWA) for Windows and Android browsers, backed by a
 | **Connected apps** | Connect email, calendar, notes, project and thousands of other apps through **MCP**: sign in directly with apps that support it (e.g. Notion, Linear), paste a token, or use a connector service (Zapier MCP, Composio, Pipedream…). Read-only tools run freely; sending, changing and deleting ask first unless you allow a tool; destructive tools always ask. |
 | **Share to Hailey** | Once installed, Hailey appears in Android's (and desktop Chrome/Edge's) Share menu: share a link, text, photo or document and choose *Ask Hailey*, *Save as note*, *Add as task* or *Save files*. Replies can be shared to WhatsApp or anywhere through your phone's share sheet. |
 | **Out and about** | Find places with OpenStreetMap (free) and add your current location to a message; prepare a phone call as a short script with a tap-to-dial link (Hailey doesn't place calls). |
-| **Android extras** | A home-screen widget (Ramble, Talk, New chat) and app shortcuts. |
+| **Android app** | A standalone app: Hailey's server runs on the phone with your own free AI key — no PC or tunnel. Phone speech and voices, reminders that ring while it's closed, the Share menu and a home-screen widget (Ramble, Talk, New chat). |
 | **Projects & workspaces** | Five starter workspaces (Personal, Pharmacy & business, Education & research, Software, General); projects with goals, milestones, decisions, risks, blockers, tasks, notes, documents, activity and progress; "Continue with Hailey" resumes a project with its context. |
 | **Knowledge centre** | Markdown notes with folders, tags, pinning and links to tasks/projects/documents; uploads of **PDF (text-based), DOCX, TXT, MD, CSV, XLSX and photos (JPG, PNG, WebP, GIF — shrunk on your device to fit 5 MB)**; full-text search with page/section references; AI summaries and key points. |
 | **Data analysis** | CSV/XLSX profiling: totals, means, medians, missing values, rankings, monthly trends, outliers, charts; downloadable reports (Word, PDF, Excel, Markdown). Calculations are done by code, and the method is explained. |
@@ -174,7 +174,20 @@ Open **Connected apps** in the sidebar, choose **Connect an app**, and paste an 
 
 ## Use Hailey on your Android phone
 
-Service workers and push notifications need **HTTPS**. Pick one:
+**The Android app (recommended).** Download `Hailey-<version>.apk` from the latest release on your phone and open it (allow *Install unknown apps* when asked). It is a complete, standalone Hailey: its server runs inside the app, and your tasks, notes, documents, memories and chats are stored on the phone. On first start it asks for an AI service — **Groq** or **Google Gemini** are free: tap the link, create a key and paste it. Nothing else is needed: no PC, no ngrok, no account.
+
+What runs where on the phone:
+
+- **Data:** SQLite (WebAssembly, with full-text search) and files, saved in the app's private storage. *Settings → Privacy* exports everything or erases it.
+- **AI:** called directly with your key (Groq, Gemini, OpenRouter, Claude, or an OpenAI-compatible model on your own PC such as Ollama).
+- **Reminders:** Android alarms, so they ring even when Hailey is closed. Routines and briefings run while the app is open or in the background.
+- **Voice:** the phone's own speech recognition and voices.
+- **Telegram:** works from the phone. **WhatsApp** needs a server on the internet, so on the phone use Telegram, or run Hailey on a PC/server for WhatsApp.
+- **Share menu and widget:** share anything to Hailey; the home-screen widget opens Ramble, Talk or a new chat.
+
+The phone app keeps its own data, separate from a Hailey server on your PC. To use one Hailey from several devices, run the server and use the browser instead:
+
+**Hailey from your server in a browser.** Service workers and push notifications need **HTTPS**. Pick one:
 
 1. **Tailscale (free, private — recommended for one person).** Install Tailscale on your PC and phone and sign in to both with the same account. On the PC, run `tailscale serve --bg 8787`. Open the `https://<pc-name>.<tailnet>.ts.net` address on your phone, set `PUBLIC_URL` to that address in `.env`, and restart Hailey. Only your own devices can reach it.
 2. **Cloudflare Tunnel (free, public URL).** Gives Hailey an HTTPS address on the internet. Keep `ALLOW_SIGNUP=false` and use a strong password. Set `TRUST_PROXY=true` and `PUBLIC_URL` to the tunnel address.
@@ -190,7 +203,7 @@ On Windows, Chrome or Edge offer **Install Hailey** from the address bar.
 Each release on the repository's **Releases** page has two downloads, built by GitHub Actions (`.github/workflows/release.yml`) whenever a tag such as `v1.0.1` is pushed:
 
 - **`Hailey-Setup-<version>.exe` (Windows).** A desktop app (Electron) that runs the Hailey server inside itself — no Node.js or commands needed. It opens Hailey in its own window and stays in the system tray so reminders keep working. Settings (AI keys, `PUBLIC_URL`) live in `%APPDATA%\Hailey\hailey.env`; open it from the tray menu → *Edit settings*, then choose *Restart Hailey*. Data is stored in `%APPDATA%\Hailey\data`. The tray menu can also **turn on phone access** by starting your ngrok tunnel (ngrok must be installed in `%LOCALAPPDATA%\ngrok` and connected to your account). The installer and app are signed by *Hailey (muhindoherbie)* with a free self-made certificate (see **Windows signing** below). Don't run the desktop app and `npm start` at the same time — they share port 8787.
-- **`Hailey-<version>.apk` (Android).** A Trusted Web Activity that opens your Hailey address (the `HAILEY_URL` repository variable) full-screen, with Hailey's notifications appearing as app notifications. Install it by opening the file on the phone and allowing *Install unknown apps* for your browser. Your PC must be running Hailey with phone access on. For the full-screen view without an address bar, the server must publish `/.well-known/assetlinks.json` — set `ANDROID_PACKAGE_NAME=app.hailey.twa` and `ANDROID_CERT_SHA256` (the signing certificate fingerprint) in `.env`. If verification fails, the app still works with a thin address bar.
+- **`Hailey-<version>.apk` (Android).** The standalone phone app (see *Use Hailey on your Android phone*). It bundles the web app and Hailey's server code (`mobile/`, built with `npm run build:android`) into a native WebView app (`android/`), with Android's networking, notifications and alarms, speech, Share menu and widget. It installs as an update over the earlier web-wrapper app (same package name and signing key).
 
 **Android signing key.** The APK is signed in GitHub Actions with a key stored in the encrypted secrets `HAILEY_KEYSTORE_B64` and `HAILEY_KEYSTORE_PASSWORD`. Keep an offline backup of the key file — every future APK must be signed with the same key, or Android will refuse to update the installed app.
 

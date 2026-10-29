@@ -12,6 +12,7 @@ interface Bridge {
   speak(text: string, lang: string): void;
   stopSpeaking(): void;
   saveFile(name: string, mime: string, base64: string): string;
+  shareText(text: string): void;
   takeShared(): string;
   openExternal(url: string): void;
   appInfo(): string;
@@ -153,6 +154,14 @@ export async function saveFile(blob: Blob, name: string) {
     return `Downloaded ${name}`;
   }
   return bridge.saveFile(name, blob.type || 'application/octet-stream', Buffer.from(await blob.arrayBuffer()).toString('base64'));
+}
+
+/** Opens the share sheet with text, e.g. to send a reply on WhatsApp. */
+export async function shareText(text: string) {
+  if (bridge) return bridge.shareText(text);
+  const nav = navigator as Navigator & { share?: Navigator['share'] };
+  if (nav.share) return void (await nav.share({ text }).catch(() => undefined));
+  await navigator.clipboard?.writeText(text);
 }
 
 export interface SharedItem {

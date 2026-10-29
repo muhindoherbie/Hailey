@@ -1,8 +1,8 @@
 {
   "name": "hailey-desktop",
   "productName": "Hailey",
-  "version": "2.2.0",
-  "description": "Hailey — personal AI assistant for Windows",
+  "version": "3.0.0",
+  "description": "Hailey \u2014 personal AI assistant for Windows",
   "author": "muhindoherbie",
   "private": true,
   "type": "module",
@@ -18,20 +18,42 @@
   "build": {
     "appId": "app.hailey.desktop",
     "productName": "Hailey",
-    "copyright": "Copyright © 2026 muhindoherbie",
-    "directories": { "output": "release" },
-    "files": ["main.mjs", "package.json"],
+    "copyright": "Copyright \u00a9 2026 muhindoherbie",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.mjs",
+      "package.json"
+    ],
     "extraResources": [
-      { "from": "build", "to": "hailey" },
-      { "from": "icon.png", "to": "icon.png" }
+      {
+        "from": "build",
+        "to": "hailey"
+      },
+      {
+        "from": "icon.png",
+        "to": "icon.png"
+      }
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "icon.png",
       "artifactName": "Hailey-Setup-${version}.exe",
       "signtoolOptions": {
-        "publisherName": ["Hailey (muhindoherbie)"],
-        "signingHashAlgorithms": ["sha256"],
+        "publisherName": [
+          "Hailey (muhindoherbie)"
+        ],
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
         "rfc3161TimeStampServer": "http://timestamp.digicert.com"
       },
       "verifyUpdateCodeSignature": false

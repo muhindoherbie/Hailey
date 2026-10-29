@@ -1,6 +1,6 @@
 {
   "name": "hailey",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
   "description": "Hailey \u2014 a personal AI assistant, companion and productivity agent (PWA + Node server).",
   "type": "module",

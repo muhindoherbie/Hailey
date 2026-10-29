@@ -14,6 +14,7 @@ import { VoiceMode } from '../components/VoiceMode';
 import { Avatar } from '../components/Avatar';
 import { useMascot } from '../lib/mascot';
 import { ApiImg } from '../components/ApiFile';
+import { isNative, shareText } from '../../mobile/native';
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string; meta: any; created_at: string; pending?: boolean };
 type ToolEv = { id: string; name: string; status: string; summary?: string; error?: string; actionId?: string; result?: any };
@@ -445,12 +446,9 @@ function ShareReply({ text }: { text: string }) {
   const plain = text.replace(/\n\n> [⚠ℹ][\s\S]*$/u, '');
   return (
     <button className="btn ghost sm" onClick={async () => {
-      if (navigator.share) {
-        await navigator.share({ text: plain }).catch(() => undefined);
-      } else {
-        window.open(`https://wa.me/?text=${encodeURIComponent(plain.slice(0, 3000))}`, '_blank', 'noopener');
-        toast('Opening WhatsApp…');
-      }
+      if (isNative || 'share' in navigator) return shareText(plain);
+      window.open(`https://wa.me/?text=${encodeURIComponent(plain.slice(0, 3000))}`, '_blank', 'noopener');
+      toast('Opening WhatsApp…');
     }}><Icon name="send" size={14} />Share</button>
   );
 }

@@ -316,6 +316,12 @@ class NativeBridge {
         }
     }
 
+    @JavascriptInterface
+    public void shareText(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
+        main.post(() -> activity.startActivity(Intent.createChooser(send, null)));
+    }
+
     /** Keeps what another app shared until the page takes it. Returns true if there was something. */
     boolean captureShare(Intent intent) {
         if (intent == null) return false;
