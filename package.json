@@ -2,7 +2,7 @@
   "name": "hailey",
   "version": "3.1.0",
   "private": true,
-  "description": "Hailey \u2014 a personal AI assistant, companion and productivity agent (PWA + Node server).",
+  "description": "Hailey — a personal AI assistant, companion and productivity agent (PWA + Node server).",
   "type": "module",
   "engines": {
     "node": ">=22.18.0"
@@ -38,6 +38,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@adobe/leonardo-contrast-colors": "^1.1.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@noble/ciphers": "^2.4.0",
