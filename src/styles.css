@@ -845,3 +845,7 @@ html.kb-open .page { padding-bottom: 16px; }
 
 /* Links inside sentences are underlined, so they don't rely on colour alone (WCAG 1.4.1). */
 p a:not(.btn), li a:not(.btn), .desc a:not(.btn), .hint a:not(.btn), .callout a:not(.btn), .sub a:not(.btn), .md a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* A list item wrapping a button or link, so the control keeps its own role for screen readers. */
+.li-wrap { display: flex; min-width: 0; }
+.li-wrap > .discover-card, .li-wrap > .chip { flex: 1 1 auto; }

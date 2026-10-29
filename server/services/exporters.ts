@@ -1,9 +1,12 @@
-import { Document, Packer, Paragraph, HeadingLevel, TextRun, Table, TableRow, TableCell, WidthType } from 'docx';
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib';
-import ExcelJS from 'exceljs';
-import PptxGenJSImport from 'pptxgenjs';
+import type { Paragraph, Table, TextRun } from 'docx';
+import type { PDFFont } from 'pdf-lib';
 
-const PptxGenJS: any = (PptxGenJSImport as any).default ?? PptxGenJSImport;
+// The file libraries are large and most sessions never make a file, so each one is loaded the
+// first time it's needed (this keeps the phone app's start-up fast).
+const docxLib = () => import('docx');
+const pdfLib = () => import('pdf-lib');
+const excelLib = async () => { const m: any = await import('exceljs'); return m.default ?? m; };
+const pptxLib = async () => { const m: any = await import('pptxgenjs'); const x = m.default ?? m; return x.default ?? x; };
 
 /** A small, safe Markdown subset parsed into blocks shared by every exporter. */
 export type MdBlock =
@@ -61,18 +64,19 @@ export function parseMarkdown(md: string): MdBlock[] {
 
 const stripInline = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
 
-function runs(text: string): TextRun[] {
+function runs(TextRunClass: typeof TextRun, text: string): TextRun[] {
   const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
-  return parts.map((p) => (p.startsWith('**') ? new TextRun({ text: stripInline(p.slice(2, -2)), bold: true }) : new TextRun(stripInline(p))));
+  return parts.map((p) => (p.startsWith('**') ? new TextRunClass({ text: stripInline(p.slice(2, -2)), bold: true }) : new TextRunClass(stripInline(p))));
 }
 
 export async function toDocx(title: string, md: string): Promise<Buffer> {
+  const { Document, Packer, Paragraph, HeadingLevel, TextRun, Table, TableRow, TableCell, WidthType } = await docxLib();
   const children: (Paragraph | Table)[] = [new Paragraph({ text: title, heading: HeadingLevel.TITLE })];
   const levels = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6];
   for (const b of parseMarkdown(md)) {
     if (b.t === 'h') children.push(new Paragraph({ text: stripInline(b.text), heading: levels[b.level - 1] }));
-    else if (b.t === 'p') children.push(new Paragraph({ children: runs(b.text), spacing: { after: 120 } }));
-    else if (b.t === 'li') children.push(new Paragraph({ children: runs(b.text), bullet: { level: 0 } }));
+    else if (b.t === 'p') children.push(new Paragraph({ children: runs(TextRun, b.text), spacing: { after: 120 } }));
+    else if (b.t === 'li') children.push(new Paragraph({ children: runs(TextRun, b.text), bullet: { level: 0 } }));
     else if (b.t === 'code') children.push(new Paragraph({ children: [new TextRun({ text: b.text, font: 'Consolas' })] }));
     else if (b.t === 'table') {
       const mk = (cells: string[], bold = false) =>
@@ -94,6 +98,7 @@ function winAnsi(s: string): string {
 }
 
 export async function toPdf(title: string, md: string): Promise<Buffer> {
+  const { PDFDocument, StandardFonts, rgb } = await pdfLib();
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
   pdf.setCreator('Hailey');
@@ -151,6 +156,7 @@ export async function toPdf(title: string, md: string): Promise<Buffer> {
 }
 
 export async function toXlsx(title: string, sheets: { name: string; headers: string[]; rows: (string | number | null)[][] }[]): Promise<Buffer> {
+  const ExcelJS = await excelLib();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Hailey';
   wb.title = title;
@@ -162,12 +168,13 @@ export async function toXlsx(title: string, sheets: { name: string; headers: str
       // Prefix values that spreadsheet apps would treat as formulas (CSV/XLSX injection).
       ws.addRow(r.map((c) => (typeof c === 'string' && /^[=+\-@\t\r]/.test(c) ? `'${c}` : c)));
     }
-    ws.columns.forEach((col) => (col.width = 18));
+    ws.columns.forEach((col: any) => (col.width = 18));
   }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 export async function toPptx(title: string, md: string): Promise<Buffer> {
+  const PptxGenJS = await pptxLib();
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   pptx.title = title;
