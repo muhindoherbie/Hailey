@@ -138,7 +138,7 @@ jobs:
 
           **Windows:** download \`Hailey-Setup-$V.exe\` and run it. The installer is signed by *Hailey (muhindoherbie)* with a self-made certificate. On a PC that trusts that certificate (see the README) Windows shows it as the verified publisher; elsewhere Windows may still show *"Windows protected your PC"* — click **More info → Run anyway**. Hailey then runs in its own window and in the system tray. Add your AI key via the tray icon → *Edit settings*, then *Restart Hailey*.
 
-          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It is a standalone app: Hailey runs on the phone itself, so no PC or tunnel is needed. On first start, pick a free AI service (Groq or Google Gemini) and paste its key.
+          **Android:** download \`Hailey-$V.apk\` on your phone and open it (allow *Install unknown apps* for your browser when asked). It is a standalone app: Hailey runs on the phone itself, so no PC or tunnel is needed. On first start, pick one of the free AI services (Gemini, Groq, OpenRouter and more), paste its key, and tap *Test speed* to use the fastest model and paste its key.
 
           Built from commit ${{ github.sha }}.
           EOF

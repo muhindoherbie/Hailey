@@ -27,6 +27,8 @@ export default function Tasks() {
   const [priority, setPriority] = useState('');
   const [sort, setSort] = useState('due');
   const [showFilters, setShowFilters] = useState(false);
+  /** How many to show; grows by 500 with "Show more" (long lists stay quick to open). */
+  const [limit, setLimit] = useState(500);
   const activeFilters = [projectId, priority, sort !== 'due' ? sort : ''].filter(Boolean).length;
   const [editing, setEditing] = useState<any | null>(null);
   const dq = useDebounced(q);
@@ -35,6 +37,7 @@ export default function Tasks() {
   if (dq) params.set('q', dq);
   if (projectId) params.set('project_id', projectId);
   if (priority) params.set('priority', priority);
+  if (limit > 500) params.set('limit', String(limit));
   const { data, error, loading, stale, reload, setData } = useData<any>(`/tasks?${params}`, { cache: true });
   const projects = useData<any>('/projects?status=active', { cache: true });
   const load = useData<any>('/tasks/workload?days=7');
@@ -99,7 +102,16 @@ export default function Tasks() {
             </ul>
           </div>
         )}
-        {data && view !== 'calendar' && <p className="faint small" style={{ marginTop: 10 }}>{topLevel.length} task{topLevel.length === 1 ? '' : 's'}</p>}
+        {data && view !== 'calendar' && (
+          <div className="row wrap" style={{ marginTop: 10 }}>
+            <p className="faint small grow">
+              {(data.total ?? topLevel.length) > data.tasks.length
+                ? `Showing ${data.tasks.length.toLocaleString()} of ${data.total.toLocaleString()} tasks`
+                : `${topLevel.length} task${topLevel.length === 1 ? '' : 's'}`}
+            </p>
+            {(data.total ?? 0) > data.tasks.length && <button className="btn sm" onClick={() => setLimit((n) => n + 500)}>Show more</button>}
+          </div>
+        )}
       </div>
       {editing && <TaskEditor task={editing} projects={projects.data?.projects ?? []} onClose={() => { setEditing(null); if (focus) navigate('/tasks', { replace: true }); }} onSaved={() => reload()} />}
     </Shell>

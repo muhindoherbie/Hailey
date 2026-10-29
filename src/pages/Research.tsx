@@ -55,7 +55,9 @@ export default function Research() {
         {status.data && !status.data.configured && (
           <div className="callout warning" style={{ marginBottom: 16 }}>
             <Icon name="info" size={18} style={{ flex: 'none', marginTop: 2 }} />
-            <div><strong>Web research isn’t set up on this server, so no searches can be performed.</strong> Add a free self-hosted <code>SEARXNG_URL</code> or a <code>BRAVE_SEARCH_API_KEY</code> (free tier) to the server’s <code>.env</code>. Meanwhile you can <Link to="/chat/new">ask Hailey</Link> — answers will come from the model’s existing knowledge, not live sources.</div>
+            <div>{import.meta.env.VITE_MOBILE
+              ? <><strong>Web research isn’t set up yet, so no searches can be performed.</strong> Add a free Brave Search key (or a SearXNG address) in <Link to="/settings#ai">Settings → AI service → More options</Link>.</>
+              : <><strong>Web research isn’t set up on this server, so no searches can be performed.</strong> Add a free self-hosted <code>SEARXNG_URL</code> or a <code>BRAVE_SEARCH_API_KEY</code> (free tier) to the server’s <code>.env</code>.</>} Meanwhile you can <Link to="/chat/new">ask Hailey</Link> — answers will come from the model’s existing knowledge, not live sources.</div>
           </div>
         )}
         <form className="ask" onSubmit={run} style={{ marginTop: 0 }}>

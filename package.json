@@ -1,6 +1,6 @@
 {
   "name": "hailey",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "description": "Hailey — a personal AI assistant, companion and productivity agent (PWA + Node server).",
   "type": "module",
@@ -50,6 +50,7 @@
     "@types/react-dom": "^19.2.0",
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.1.2",
+    "axe-core": "^4.14.0",
     "buffer": "^6.0.3",
     "dompurify": "^3.4.17",
     "esbuild": "^0.28.2",
