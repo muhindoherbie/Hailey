@@ -26,6 +26,8 @@ export default function Tasks() {
   const [projectId, setProjectId] = useState('');
   const [priority, setPriority] = useState('');
   const [sort, setSort] = useState('due');
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilters = [projectId, priority, sort !== 'due' ? sort : ''].filter(Boolean).length;
   const [editing, setEditing] = useState<any | null>(null);
   const dq = useDebounced(q);
   const apiView = view === 'calendar' ? 'all' : view === 'all' ? 'all' : view;
@@ -63,8 +65,13 @@ export default function Tasks() {
             <button key={v.id} role="tab" aria-selected={view === v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>{v.label}</button>
           ))}
         </div>
-        <div className="row wrap" style={{ marginBottom: 12 }}>
-          <input className="input" style={{ maxWidth: 260 }} placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />
+        <div className="row" style={{ marginBottom: showFilters ? 8 : 12 }}>
+          <input className="input grow" style={{ maxWidth: 360 }} type="search" placeholder="Search tasks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />
+          <button type="button" className={`btn ${activeFilters ? 'tonal' : ''}`} aria-expanded={showFilters} aria-controls="task-filters" onClick={() => setShowFilters((v) => !v)}>
+            <Icon name="filter" size={16} />Filter{activeFilters ? ` · ${activeFilters}` : ''}
+          </button>
+        </div>
+        <div id="task-filters" className="row wrap filter-panel" hidden={!showFilters} style={{ marginBottom: 12 }}>
           <select className="select" style={{ maxWidth: 200 }} value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Filter by project">
             <option value="">All projects</option>
             {projects.data?.projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
